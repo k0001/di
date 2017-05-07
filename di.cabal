@@ -10,6 +10,7 @@ category: Data
 build-type: Simple
 cabal-version: >=1.18
 synopsis: Easy and powerful typeful logging without monad towers.
+description: Easy and powerful typeful logging without monad towers.
 homepage: https://github.com/k0001/di
 bug-reports: https://github.com/k0001/di/issues
 
