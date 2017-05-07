@@ -6,7 +6,7 @@ copyright: Renzo Carbonara 2017
 license: BSD3
 license-file: LICENSE.txt
 extra-source-files: README.md CHANGELOG.md
-category: Data
+category: Logging
 build-type: Simple
 cabal-version: >=1.18
 synopsis: Easy and powerful typeful logging without monad towers.
