@@ -33,10 +33,9 @@ module Di
  , mkDiTextFileHandle
  ) where
 
-import Control.Concurrent (forkIO, forkFinally, myThreadId)
+import Control.Concurrent (forkFinally, myThreadId)
 import Control.Concurrent.STM
 import qualified Control.Exception as Ex
-import Control.Monad (void)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Monoid (mconcat, mappend, (<>))
 import Data.String (IsString(fromString))
@@ -129,7 +128,7 @@ diFlush di = liftIO $ atomically $ check =<< isEmptyTQueue (_diLogs di)
 diAsync :: MonadIO m => Di path msg -> Level -> msg -> m ()
 diAsync (Di dLog _ dMinLevel dLogs) l m
   | l < dMinLevel = pure ()
-  | otherwise = liftIO $ void $ forkIO $ do
+  | otherwise = liftIO $ do
        ts <- Time.getCurrentTime
        atomically $ writeTQueue dLogs (dLog l ts mempty m)
 {-# INLINABLE diAsync #-}
@@ -238,7 +237,9 @@ err di = diSync di ERR
 --
 -- /WARNING/ This function returns immediately, which makes it ideal for usage
 -- in tight loops. However, if logging the message fails later, you won't be
--- able to catch the relevant exception.
+-- able to catch the relevant exception. Said exception will be printed out to
+-- 'IO.stderr' as a last resort, and processing of further log messages will
+-- continue.
 dbg' :: MonadIO m => Di path msg -> msg -> m ()
 dbg' di = diAsync di DBG
 
@@ -248,7 +249,9 @@ dbg' di = diAsync di DBG
 --
 -- /WARNING/ This function returns immediately, which makes it ideal for usage
 -- in tight loops. However, if logging the message fails later, you won't be
--- able to catch the relevant exception.
+-- able to catch the relevant exception. Said exception will be printed out to
+-- 'IO.stderr' as a last resort, and processing of further log messages will
+-- continue.
 inf' :: MonadIO m => Di path msg -> msg -> m ()
 inf' di = diAsync di INF
 
@@ -258,7 +261,9 @@ inf' di = diAsync di INF
 --
 -- /WARNING/ This function returns immediately, which makes it ideal for usage
 -- in tight loops. However, if logging the message fails later, you won't be
--- able to catch the relevant exception.
+-- able to catch the relevant exception. Said exception will be printed out to
+-- 'IO.stderr' as a last resort, and processing of further log messages will
+-- continue.
 wrn' :: MonadIO m => Di path msg -> msg -> m ()
 wrn' di = diAsync di WRN
 
@@ -268,7 +273,9 @@ wrn' di = diAsync di WRN
 --
 -- /WARNING/ This function returns immediately, which makes it ideal for usage
 -- in tight loops. However, if logging the message fails later, you won't be
--- able to catch the relevant exception.
+-- able to catch the relevant exception. Said exception will be printed out to
+-- 'IO.stderr' as a last resort, and processing of further log messages will
+-- continue.
 err' :: MonadIO m => Di path msg -> msg -> m ()
 err' di = diAsync di ERR
 
