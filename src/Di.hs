@@ -6,7 +6,7 @@
 -- | Intended module usage:
 --
 -- @
--- import Di (Di)
+-- import Di (Di, dbg, inf, wrn, err)
 -- import qualified Di
 -- @
 
