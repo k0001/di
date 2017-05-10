@@ -18,6 +18,6 @@ library
   hs-source-dirs: src
   default-language: Haskell2010
   exposed-modules: Di
-  build-depends: base >=4.9 && <5.0, stm, text, time, transformers
+  build-depends: base >=4.9 && <5.0, stm, time, transformers
   ghcjs-options: -Wall -O3
   ghc-options: -Wall -O2

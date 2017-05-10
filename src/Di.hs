@@ -30,8 +30,8 @@ module Di
  , wrn'
  , err'
    -- * Backends
- , mkDiTextStderr
- , mkDiTextFileHandle
+ , mkDiStringStderr
+ , mkDiStringHandle
  ) where
 
 import Control.Concurrent (forkFinally, myThreadId)
@@ -40,8 +40,6 @@ import qualified Control.Exception as Ex
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Monoid (mconcat, mappend, (<>))
 import Data.String (IsString(fromString))
-import qualified Data.Text as Text
-import qualified Data.Text.IO as Text
 import qualified Data.Time as Time
 import qualified System.IO as IO
 
@@ -148,7 +146,7 @@ diSync di l m = diAsync di l m >> flush di
 -- 'push' di [a, b]   ===   'push' ('push' di [a]) [b]
 -- @
 --
--- See 'mkDiTextStderr' for an example behaviour.
+-- See 'mkDiStringStderr' for an example behaviour.
 push :: Di path msg -> [path] -> Di path msg
 push (Di dLog dPathMap dMinLevel dLogs) ps =
   let dLog' = \l ts p1 m -> dLog l ts (mconcat (map dPathMap ps) <> p1) m
@@ -297,7 +295,7 @@ err di = diAsync di ERR
 {-
 test :: IO ()
 test = do
-  d0 <- mkDiTextStderr
+  d0 <- mkDiStringStderr
   dbg d0 "a"
   let d1 = push d0 ["f/oo"]
   inf' d1 "b"
@@ -306,9 +304,9 @@ test = do
   let d3 = push d2 ["qux"]
   inf (level d3 WRN) "d"
   err d0 "e\nf"
-  let d4 = push (contrapath (Text.pack . show) d3) [True, False]
+  let d4 = push (contrapath show d3) [True, False]
   err d4 "asd"
-  let d5 = push (contramsg (Text.pack . show) d4) [False]
+  let d5 = push (contramsg show d4) [False]
   err' d5 True
 -}
 
@@ -317,15 +315,15 @@ test = do
 -- | Strings separated by a forward slash. Doesn't contain white space.
 --
 -- Use 'fromString' (GHC's  @OverloadedStrings@ extension) to construct a
--- 'TextPath'.
-newtype TextPath = TextPath { unTextPath :: Text.Text }
+-- 'StringPath'.
+newtype StringPath = StringPath { unStringPath :: String }
   deriving (Eq, Ord, Show)
 
-instance IsString TextPath where
-  fromString = textPathSingleton . Text.pack
+instance IsString StringPath where
+  fromString = stringPathSingleton
 
-textPathSingleton :: Text.Text -> TextPath
-textPathSingleton = TextPath . Text.map f
+stringPathSingleton :: String -> StringPath
+stringPathSingleton = StringPath . map f
   where f :: Char -> Char
         f '/'  = '.'
         f ' '  = '_'
@@ -333,37 +331,39 @@ textPathSingleton = TextPath . Text.map f
         f '\r' = '_'
         f c    = c
 
-instance Monoid TextPath where
-  mempty = TextPath ""
-  mappend (TextPath "") b = b
-  mappend a (TextPath "") = a
-  mappend (TextPath a) (TextPath b) = TextPath (a <> "/" <> b)
+instance Monoid StringPath where
+  mempty = StringPath ""
+  mappend (StringPath "") b = b
+  mappend a (StringPath "") = a
+  mappend (StringPath a) (StringPath b) = StringPath (a <> "/" <> b)
 
--- | 'Text.Text' is written to 'IO.Handle' using the system's locale encoding.
--- See 'mkDiTextStderr' for example output.
-mkDiTextFileHandle
+-- | 'String's are written to 'IO.Handle' using the 'IO.Handle''s locale
+-- encoding.
+--
+-- See 'mkDiStringStderr' for example output.
+mkDiStringHandle
   :: MonadIO m
   => IO.Handle
-  -> m (Di Text.Text Text.Text)
-mkDiTextFileHandle h = liftIO $ do
+  -> m (Di String String)
+mkDiStringHandle h = liftIO $ do
     IO.hSetBuffering h IO.LineBuffering
-    fmap (contrapath textPathSingleton) $ mkDi $ \l ts p m -> do
-       Text.hPutStrLn h $ mconcat
-          [ Text.pack (show l), " ", Text.pack (renderIso8601 ts)
-          , if p == mempty then "" else (" " <> unTextPath p)
+    fmap (contrapath stringPathSingleton) $ mkDi $ \l ts p m -> do
+       IO.hPutStrLn h $ mconcat
+          [ show l, " ", renderIso8601 ts
+          , if p == mempty then "" else (" " <> unStringPath p)
           , ": ", noBreaks m ]
        IO.hFlush h
   where
-    noBreaks :: Text.Text -> Text.Text
-    noBreaks = Text.concatMap $ \case
+    noBreaks :: String -> String
+    noBreaks = concatMap $ \case
       '\n' -> "\\n"
       '\r' -> "\\r"
-      c -> Text.singleton c
+      c -> [c]
 
--- | 'Text.Text' is written to 'IO.stderr' using the system's locale encoding.
+-- | 'String' is written to 'IO.stderr' using the system's locale encoding.
 --
 -- @
--- > d0 <- 'mkDiTextStderr'
+-- > d0 <- 'mkDiStringStderr'
 -- > 'dbg' d0 "a"
 -- __DBG 2017-05-06T19:01:27:306168750000Z: a__
 -- > let d1 = push d0 ["f\/oo"]       -- /\'\/' is converted to \'.'/
@@ -378,8 +378,8 @@ mkDiTextFileHandle h = liftIO $ do
 -- > 'err' d0 "e\\nf"                  -- /d0, of course, still works/
 -- __ERR 2017-05-06T19:01:27:823167007000Z: e\\nf__
 -- @
-mkDiTextStderr :: MonadIO m => m (Di Text.Text Text.Text)
-mkDiTextStderr = mkDiTextFileHandle IO.stderr
+mkDiStringStderr :: MonadIO m => m (Di String String)
+mkDiStringStderr = mkDiStringHandle IO.stderr
 
 --------------------------------------------------------------------------------
 

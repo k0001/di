@@ -1,5 +1,11 @@
 # Version HEAD
 
+* Drop 'mkDiTextStderr' and 'mkDiTextFileHandle' in favour of 'mkDiStringHandle'
+  and 'mkDiStringStderr'. The rationale is that we are already paying the costs
+  of many 'show' calls, and users of this library are quite likely to use
+  'String's anyway (since they, too, are likely using 'show' results). We will
+  bring back 'Text' based 'mkDiTextStderr' when we can make it performant.
+
 * Rename the `path` and `msg` functions to `contrapath` and `contramsg`,
   flipping the order of their arguments so that the function comes first (like
   in `contramap`).
