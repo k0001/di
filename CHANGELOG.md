@@ -1,5 +1,9 @@
 # Version HEAD
 
+* Rename the `path` and `msg` functions to `contrapath` and `contramsg`,
+  flipping the order of their arguments so that the function comes first (like
+  in `contramap`).
+
 * Export `flush`.
 
 * Swap the names beween the sync and async logging functions (e.g., `err'` vs

@@ -14,8 +14,8 @@ module Di
  ( Di
  , mkDi
  , push
- , path
- , msg
+ , contrapath
+ , contramsg
  , level
  , Level(DBG, INF, WRN, ERR)
    -- * Asynchronous logging
@@ -63,7 +63,7 @@ import qualified System.IO as IO
 -- 'Data.Map.Strict.Map' that gets enriched with more information as we 'push'
 -- down the @path@). This improves type safety, as well as the composability of
 -- the @path@ and @msg@ values. In particular, @path@ and @msg@ are
--- contravariant values (see the 'path' and 'msg' functions).
+-- contravariant values (see the 'contrapath' and 'contramsg' functions).
 --
 -- Contrary to other logging approaches based on monadic interfaces, a 'Di' is a
 -- value that is expected to be passed around explicitly. A 'Di' can be safely
@@ -165,15 +165,15 @@ push (Di dLog dPathMap dMinLevel dLogs) ps =
 -- @path@ type using this 'path' function:
 --
 -- @
--- 'path' (x :: 'Di' ['String'] msg) ('map' 'show') :: 'Di' ['Int'] msg
+-- 'contrapath' ('map' 'show') (x :: 'Di' ['String'] msg) :: 'Di' ['Int'] msg
 -- @
 --
 -- The 'Monoid'al behavior of the original @path'@ is preserved in the resulting
 -- 'Di'.
-path :: Di path' msg -> (path -> path') -> Di path msg
-path (Di dLog dPathMap dMinLevel dLogs) f =
+contrapath :: (path -> path') -> Di path' msg  -> Di path msg
+contrapath f (Di dLog dPathMap dMinLevel dLogs) =
   Di dLog (dPathMap . f) dMinLevel dLogs
-{-# INLINABLE path #-}
+{-# INLINABLE contrapath #-}
 
 -- | A 'Di' is contravariant in its @msg@ argument.
 --
@@ -185,13 +185,13 @@ path (Di dLog dPathMap dMinLevel dLogs) f =
 -- 'msg' function:
 --
 -- @
--- 'msg' (x :: 'Di' path 'String') 'show' :: 'Di' path 'Int'
+-- 'contramsg' 'show' (x :: 'Di' path 'String') :: 'Di' path 'Int'
 -- @
-msg :: Di path msg' -> (msg -> msg') -> Di path msg
-msg (Di dLog dPathMap dMinLevel dLogs) f =
+contramsg :: (msg -> msg') -> Di path msg' -> Di path msg
+contramsg f (Di dLog dPathMap dMinLevel dLogs) =
   let dLog' = \l ts p m -> dLog l ts p (f m)
   in Di dLog' dPathMap dMinLevel dLogs
-{-# INLINABLE msg #-}
+{-# INLINABLE contramsg #-}
 
 -- | Returns a new 'Di' on which messages below the given 'Level' are not
 -- logged, where ther ordering of levels is as follow:
@@ -306,9 +306,9 @@ test = do
   let d3 = push d2 ["qux"]
   inf (level d3 WRN) "d"
   err d0 "e\nf"
-  let d4 = push (path d3 (Text.pack . show)) [True, False]
+  let d4 = push (contrapath (Text.pack . show) d3) [True, False]
   err d4 "asd"
-  let d5 = push (msg d4 (Text.pack . show)) [False]
+  let d5 = push (contramsg (Text.pack . show) d4) [False]
   err' d5 True
 -}
 
@@ -347,7 +347,7 @@ mkDiTextFileHandle
   -> m (Di Text.Text Text.Text)
 mkDiTextFileHandle h = liftIO $ do
     IO.hSetBuffering h IO.LineBuffering
-    fmap (flip path textPathSingleton) $ mkDi $ \l ts p m -> do
+    fmap (contrapath textPathSingleton) $ mkDi $ \l ts p m -> do
        Text.hPutStrLn h $ mconcat
           [ Text.pack (show l), " ", Text.pack (renderIso8601 ts)
           , if p == mempty then "" else (" " <> unTextPath p)
