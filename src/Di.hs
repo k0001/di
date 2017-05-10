@@ -18,12 +18,13 @@ module Di
  , msg
  , level
  , Level(DBG, INF, WRN, ERR)
-   -- * Synchronous logging
+   -- * Asynchronous logging
  , dbg
  , inf
  , wrn
  , err
-   -- * Asynchronous logging
+ , flush
+   -- * Synchronous logging
  , dbg'
  , inf'
  , wrn'
@@ -67,8 +68,8 @@ import qualified System.IO as IO
 -- Contrary to other logging approaches based on monadic interfaces, a 'Di' is a
 -- value that is expected to be passed around explicitly. A 'Di' can be safely
 -- used concurrently, and messages are rendered in the order they were submitted
--- for logging, both in the case of synchronous logging (e.g., 'err') and
--- asynchronous logging (e.g., 'err'').
+-- for logging, both in the case of synchronous logging (e.g., 'err'') and
+-- asynchronous logging (e.g., 'err').
 --
 -- 'Di' is pronounced as \"dee" (not \"die" nor \"dye" nor \"day"). \"Di" is
 -- the spanish word for an imperative form of the verb \"decir", which in
@@ -113,9 +114,9 @@ mkDi f = liftIO $ do
            worker di
 
 -- | Block until all messages being logged have finished processing.
-diFlush :: MonadIO m => Di path msg -> m ()
-diFlush di = liftIO $ atomically $ check =<< isEmptyTQueue (_diLogs di)
-{-# INLINE diFlush #-}
+flush :: MonadIO m => Di path msg -> m ()
+flush di = liftIO $ atomically $ check =<< isEmptyTQueue (_diLogs di)
+{-# INLINE flush #-}
 
 -- | Asynchronously log a message with the given 'Level' by queueing it in FIFO
 -- order to be logged in a different thread as soon as possible. The timestamp
@@ -135,7 +136,7 @@ diAsync (Di dLog _ dMinLevel dLogs) l m
 
 -- | Log a message with the given 'Level'.
 diSync :: MonadIO m => Di path msg -> Level -> msg -> m ()
-diSync di l m = diAsync di l m >> diFlush di
+diSync di l m = diAsync di l m >> flush di
 {-# INLINABLE diSync #-}
 
 -- | Push new @path@s to the 'Di'.
@@ -218,70 +219,78 @@ data Level
 --------------------------------------------------------------------------------
 
 -- | Synchronously log a message with 'DBG' level.
-dbg :: MonadIO m => Di path msg -> msg -> m ()
-dbg di = diSync di DBG
+dbg' :: MonadIO m => Di path msg -> msg -> m ()
+dbg' di = diSync di DBG
+{-# INLINE dbg' #-}
 
 -- | Synchronously log a message with 'INF' level.
-inf :: MonadIO m => Di path msg -> msg -> m ()
-inf di = diSync di INF
+inf' :: MonadIO m => Di path msg -> msg -> m ()
+inf' di = diSync di INF
+{-# INLINE inf' #-}
 
 -- | Synchronously log a message with 'WRN' level.
-wrn :: MonadIO m => Di path msg -> msg -> m ()
-wrn di = diSync di WRN
+wrn' :: MonadIO m => Di path msg -> msg -> m ()
+wrn' di = diSync di WRN
+{-# INLINE wrn' #-}
 
 -- | Synchronously log a message with 'ERR' level.
-err :: MonadIO m => Di path msg -> msg -> m ()
-err di = diSync di ERR
+err' :: MonadIO m => Di path msg -> msg -> m ()
+err' di = diSync di ERR
+{-# INLINE err' #-}
 
 --------------------------------------------------------------------------------
 
 -- | Asynchronously log a message with 'DBG' level by queueing it in FIFO
 -- order to be logged in a different thread as soon as possible. The timestamp
--- of the logged message will correctly represent the time of the 'dbg'' call.
+-- of the logged message will correctly represent the time of the 'dbg' call.
 --
 -- /WARNING/ This function returns immediately, which makes it ideal for usage
 -- in tight loops. However, if logging the message fails later, you won't be
 -- able to catch the relevant exception. Said exception will be printed out to
 -- 'IO.stderr' as a last resort, and processing of further log messages will
 -- continue.
-dbg' :: MonadIO m => Di path msg -> msg -> m ()
-dbg' di = diAsync di DBG
+dbg :: MonadIO m => Di path msg -> msg -> m ()
+dbg di = diAsync di DBG
+{-# INLINE dbg #-}
 
 -- | Asynchronously log a message with 'INF' level by queueing it in FIFO
 -- order to be logged in a different thread as soon as possible. The timestamp
--- of the logged message will correctly represent the time of the 'inf'' call.
+-- of the logged message will correctly represent the time of the 'inf' call.
 --
 -- /WARNING/ This function returns immediately, which makes it ideal for usage
 -- in tight loops. However, if logging the message fails later, you won't be
 -- able to catch the relevant exception. Said exception will be printed out to
 -- 'IO.stderr' as a last resort, and processing of further log messages will
 -- continue.
-inf' :: MonadIO m => Di path msg -> msg -> m ()
-inf' di = diAsync di INF
+inf :: MonadIO m => Di path msg -> msg -> m ()
+inf di = diAsync di INF
+{-# INLINE inf #-}
 
 -- | Asynchronously log a message with 'WRN' level by queueing it in FIFO
 -- order to be logged in a different thread as soon as possible. The timestamp
--- of the logged message will correctly represent the time of the 'wrn'' call.
+-- of the logged message will correctly represent the time of the 'wrn' call.
 --
 -- /WARNING/ This function returns immediately, which makes it ideal for usage
 -- in tight loops. However, if logging the message fails later, you won't be
 -- able to catch the relevant exception. Said exception will be printed out to
 -- 'IO.stderr' as a last resort, and processing of further log messages will
 -- continue.
-wrn' :: MonadIO m => Di path msg -> msg -> m ()
-wrn' di = diAsync di WRN
+wrn :: MonadIO m => Di path msg -> msg -> m ()
+wrn di = diAsync di WRN
+{-# INLINE wrn #-}
 
 -- | Asynchronously log a message with 'ERR' level by queueing it in FIFO
 -- order to be logged in a different thread as soon as possible. The timestamp
--- of the logged message will correctly represent the time of the 'err'' call.
+-- of the logged message will correctly represent the time of the 'err' call.
 --
 -- /WARNING/ This function returns immediately, which makes it ideal for usage
 -- in tight loops. However, if logging the message fails later, you won't be
 -- able to catch the relevant exception. Said exception will be printed out to
 -- 'IO.stderr' as a last resort, and processing of further log messages will
 -- continue.
-err' :: MonadIO m => Di path msg -> msg -> m ()
-err' di = diAsync di ERR
+err :: MonadIO m => Di path msg -> msg -> m ()
+err di = diAsync di ERR
+{-# INLINE err #-}
 
 --------------------------------------------------------------------------------
 
@@ -300,7 +309,7 @@ test = do
   let d4 = push (path d3 (Text.pack . show)) [True, False]
   err d4 "asd"
   let d5 = push (msg d4 (Text.pack . show)) [False]
-  err d5 True
+  err' d5 True
 -}
 
 --------------------------------------------------------------------------------
