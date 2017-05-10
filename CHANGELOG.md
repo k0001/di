@@ -1,5 +1,7 @@
 # Version HEAD
 
+* Fix ISO8601 formatting of second fractions.
+
 * Drop `mkDiTextStderr` and `mkDiTextFileHandle` in favour of `mkDiStringHandle`
   and `mkDiStringStderr`. The rationale is that we are already paying the costs
   of many `show` calls, and users of this library are quite likely to use

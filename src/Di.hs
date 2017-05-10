@@ -384,7 +384,7 @@ mkDiStringStderr = mkDiStringHandle IO.stderr
 --------------------------------------------------------------------------------
 
 renderIso8601 :: Time.UTCTime -> String
-renderIso8601 = Time.formatTime Time.defaultTimeLocale "%Y-%m-%dT%H:%M:%S:%qZ"
+renderIso8601 = Time.formatTime Time.defaultTimeLocale "%Y-%m-%dT%H:%M:%S.%qZ"
 
 catchSync :: IO a -> (Ex.SomeException -> IO a) -> IO a
 catchSync m f = Ex.catch m $ \se -> case Ex.asyncExceptionFromException se of
