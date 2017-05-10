@@ -138,15 +138,19 @@ diSync :: MonadIO m => Di path msg -> Level -> msg -> m ()
 diSync di l m = diAsync di l m >> diFlush di
 {-# INLINABLE diSync #-}
 
--- | Push a new @path@ to the 'Di'.
+-- | Push new @path@s to the 'Di'.
 --
 -- The passed in 'Di' can continue to be used even after using 'push' or the
 -- returned 'Di'.
 --
+-- @
+-- 'push' di [a, b]   ===   'push' ('push' di [a]) [b]
+-- @
+--
 -- See 'mkDiTextStderr' for an example behaviour.
-push :: Di path msg -> path -> Di path msg
-push (Di dLog dPathMap dMinLevel dLogs) p0 =
-  let dLog' = \l ts p1 m -> dLog l ts (dPathMap p0 <> p1) m
+push :: Di path msg -> [path] -> Di path msg
+push (Di dLog dPathMap dMinLevel dLogs) ps =
+  let dLog' = \l ts p1 m -> dLog l ts (mconcat (map dPathMap ps) <> p1) m
   in Di dLog' dPathMap dMinLevel dLogs
 {-# INLINABLE push #-}
 
@@ -286,16 +290,16 @@ test :: IO ()
 test = do
   d0 <- mkDiTextStderr
   dbg d0 "a"
-  let d1 = push d0 "f/oo"
+  let d1 = push d0 ["f/oo"]
   inf' d1 "b"
-  let d2 = push d1 "b ar"
+  let d2 = push d1 ["b ar"]
   wrn d2 "c"
-  let d3 = push d2 "qux"
+  let d3 = push d2 ["qux"]
   inf (level d3 WRN) "d"
   err d0 "e\nf"
-  let d4 = push (path d3 (Text.pack . show)) [True,False]
+  let d4 = push (path d3 (Text.pack . show)) [True, False]
   err d4 "asd"
-  let d5 = push (msg d4 (Text.pack . show)) []
+  let d5 = push (msg d4 (Text.pack . show)) [False]
   err d5 True
 -}
 
@@ -353,13 +357,13 @@ mkDiTextFileHandle h = liftIO $ do
 -- > d0 <- 'mkDiTextStderr'
 -- > 'dbg' d0 "a"
 -- __DBG 2017-05-06T19:01:27:306168750000Z: a__
--- > let d1 = push d0 "f\/oo"       -- /\'\/' is converted to \'.'/
+-- > let d1 = push d0 ["f\/oo"]       -- /\'\/' is converted to \'.'/
 -- > 'inf' d1 "b"
 -- __INF 2017-05-06T19:01:27:314333636000Z f.oo: b__
--- > let d2 = push d1 "b ar"        -- /\' ' is converted to \'_'/
+-- > let d2 = push d1 ["b ar"]        -- /\' ' is converted to \'_'/
 -- > 'wrn' d2 "c"
 -- __WRN 2017-05-06T19:01:27:322092498000Z f.oo\/b_ar: c__
--- > let d3 = push d2 "qux"
+-- > let d3 = push d2 ["qux"]
 -- > 'err' d3 "d"
 -- __ERR 2017-05-06T19:01:27:326704385000Z f.oo\/b_ar\/qux: d__
 -- > 'err' d0 "e\\nf"                  -- /d0, of course, still works/
