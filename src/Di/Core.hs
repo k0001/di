@@ -124,7 +124,7 @@ log (Di dLog dFilter dLogs) !l = \(!m) ->
 
 -- | Block until all messages being logged have finished processing.
 --
--- Mabually calling 'flush' is not usually necessary, but, if at some point you
+-- Manually calling 'flush' is not usually necessary, but, if at some point you
 -- want to ensure that all messages logged until then have properly rendered to
 -- the underlying backend, then 'flush' will block until that happens.
 flush :: MonadIO m => Di level path msg -> m ()
