@@ -1,5 +1,5 @@
 name: di
-version: 0.1
+version: 0.2
 author: Renzo Carbonara
 maintainer: renλren.zone
 copyright: Renzo Carbonara 2017
@@ -9,8 +9,8 @@ extra-source-files: README.md CHANGELOG.md
 category: Logging
 build-type: Simple
 cabal-version: >=1.18
-synopsis: Easy and powerful typeful logging without monad towers.
-description: Easy and powerful typeful logging without monad towers.
+synopsis: Easy, powerful, structured and typeful logging without monad towers.
+description: Easy, powerful, structured and typeful logging without monad towers.
 homepage: https://github.com/k0001/di
 bug-reports: https://github.com/k0001/di/issues
 

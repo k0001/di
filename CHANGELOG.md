@@ -1,4 +1,4 @@
-# Version HEAD
+# Version 0.2
 
 * BREAKING CHANGE: `Di` now takes a new type argument `level`.
 
