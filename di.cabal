@@ -18,6 +18,22 @@ library
   hs-source-dirs: src
   default-language: Haskell2010
   exposed-modules: Di
+  other-modules: Di.Core Di.Backend
   build-depends: base >=4.9 && <5.0, stm, time, transformers
   ghcjs-options: -Wall -O3
   ghc-options: -Wall -O2
+
+test-suite test
+  default-language: Haskell2010
+  type: exitcode-stdio-1.0
+  hs-source-dirs: test
+  main-is: Main.hs
+  build-depends:
+    base,
+    bytestring,
+    di,
+    stm,
+    QuickCheck,
+    tasty,
+    tasty-hunit,
+    tasty-quickcheck
