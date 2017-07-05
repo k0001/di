@@ -47,7 +47,7 @@ import qualified System.IO as IO
 -- type safety, as well as the composability of the @level@, @path@ and @msg@
 -- values. In particular, all of @level@, @path@ and @msg@ are contravariant
 -- values, which in practice means including a precise 'Di' into a more general
--- 'Di' is always possible (see the 'contralevel@, 'contrapath' and 'contramsg'
+-- 'Di' is always possible (see the 'contralevel', 'contrapath' and 'contramsg'
 -- functions).
 --
 -- Messages of undesired importance levels can be muted by using 'filter'.
@@ -62,7 +62,7 @@ import qualified System.IO as IO
 --
 -- 'Di' is pronounced as \"dee" (not \"die" nor \"dye" nor \"day"). \"Di" is
 -- the spanish word for an imperative form of the verb \"decir", which in
--- english means "to say".
+-- english means "to say", which clearly has something to do with logging.
 data Di level path msg = Di
   { _diLog :: Time.UTCTime -> level -> path -> msg -> IO ()
     -- ^ Low level logging function.
