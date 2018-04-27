@@ -2,25 +2,29 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Di.Df1
- ( renderLogColor
+ ( df1
  ) where
 
-import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Monoid ((<>))
 import qualified Data.Text.Lazy as TL
-import qualified Data.Text.Lazy.IO as TL
 import qualified Data.Text.Lazy.Builder as TB
-import qualified Data.Time.Clock.System as Time
 import Prelude hiding (log, filter)
-import qualified System.IO as IO
 
 import Di.Misc (renderIso8601)
 import Di.Types
  (Log, logTime, logPath, logLevel, logMessage,
   Level(Debug, Info, Notice, Warning, Error, Critical, Alert, Emergency),
-  Path(Attr, Push, Root))
+  Path(Attr, Push, Root),
+  LogRenderer(TextLogRenderer))
 
 --------------------------------------------------------------------------------
+
+-- | Render in the __df1__ format.
+df1 :: LogRenderer
+{-# INLINE df1 #-}
+df1 = TextLogRenderer $ \case
+  True -> renderLogColor
+  False -> renderLogColor -- TODO
 
 renderLogColor :: Log -> TB.Builder
 {-# INLINE renderLogColor #-}

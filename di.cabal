@@ -19,7 +19,14 @@ library
   default-language: Haskell2010
   exposed-modules: Di Di.Df1
   other-modules: Di.Core Di.Misc Di.Types Di.Writer
-  build-depends: base >=4.9 && <5.0, mtl, stm, time, transformers, text
+  build-depends:
+    base >=4.9 && <5.0,
+    bytestring,
+    mtl,
+    stm,
+    text,
+    time,
+    transformers
   ghcjs-options: -Wall -O3
   ghc-options: -Wall -O2
   if !os(windows)

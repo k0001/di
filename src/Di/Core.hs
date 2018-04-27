@@ -8,20 +8,21 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# OPTIONS_HADDOCK not-home #-}
 
 module Di.Core
- ( Di(..)
- , Log(..)
- , Level(..)
- , Path(..)
- , mkDi
- , MonadDi(..)
- , DiT(..)
+ ( new
+
+ , MonadDi(ask, local)
+
+ , DiT(DiT, unDiT)
  , runDiT
+
  , flush
  , push
  , attr
  , max
+
  , log
  , emergency
  , alert
@@ -31,8 +32,9 @@ module Di.Core
  , notice
  , info
  , debug
+
+
  , test
- , renderIso8601
  ) where
 
 import Control.Applicative (Alternative)
@@ -64,17 +66,18 @@ import Data.Word (Word64)
 import Prelude hiding (log, max, error)
 import qualified System.IO as IO
 
+import Di.Df1 (df1)
 import Di.Misc (renderIso8601, catchSync)
 import Di.Types
   (Log(Log, logTime, logLevel, logPath, logMessage),
    Level(Debug, Info, Notice, Warning, Error, Critical, Alert, Emergency),
    Path(Attr, Push, Root),
    Di(Di, diMax, diPath, diLogs),
-   Writer(Writer))
+   Writer(Writer, unWriter))
+import qualified Di.Writer (stderr)
 
 
 --------------------------------------------------------------------------------
-
 
 -- | Build a new 'Di' from a logging function.
 --
@@ -82,35 +85,41 @@ import Di.Types
 -- just logged to 'IO.stderr' and then ignored.
 --
 -- /Note:/ There's no need to "release" the obtained 'Di'.
-mkDi
+new
   :: MonadIO m
   => String -- ^ Root path name.
   -> Writer
   -> m Di -- ^
-mkDi name (Writer getWrite) = liftIO $ do
-   di <- Di Info (Root (TL.pack name)) <$> newTQueueIO
+new name writer = liftIO $ do
    me <- myThreadId
-   write <- getWrite
-   _ <- forkFinally (worker write di) (either (Ex.throwTo me) pure)
-   pure di
+   tqLogs :: TQueue Log <- newTQueueIO
+   writeFallback :: Log -> IO () <- unWriter (Di.Writer.stderr Di.Df1.df1)
+   write :: Log -> IO () <- unWriter writer
+   _ <- forkFinally (worker writeFallback write tqLogs)
+                    (either (Ex.throwTo me) pure)
+   pure (Di Info (Root (TL.pack name)) tqLogs)
  where
-   worker :: (Log -> IO ()) -> Di -> IO ()
-   worker write di = fix $ \k -> do
+   worker :: (Log -> IO ()) -> (Log -> IO ()) -> TQueue Log -> IO ()
+   worker writeFallback write tqLogs = fix $ \k -> do
      eio <- Ex.try $ atomically $ do
-        log' :: Log <- peekTQueue (diLogs di)
-        pure (Ex.finally (write log') (atomically (readTQueue (diLogs di))))
+        log' :: Log <- peekTQueue tqLogs
+        pure (log', Ex.finally (write log') (atomically (readTQueue tqLogs)))
      case eio of
         Left (_ :: Ex.BlockedIndefinitelyOnSTM) -> do
            pure ()  -- Nobody writes to '_diLogs' anymore, so we can just stop.
-        Right io -> do
+        Right (log', io) -> do
            catchSync io $ \se -> do
               -- Fallback exception logging to stderr.
               syst <- Time.getSystemTime
-              TL.hPutStrLn IO.stderr $ TB.toLazyText $
-                 renderIso8601 syst <>
-                 "\027[1;31m ERROR Logging failed due to: " <>
-                 TB.fromString (show (Ex.displayException se)) <>
-                 "\027[0m"
+              writeFallback $ log'
+                 { logTime = syst
+                 , logLevel = Error
+                 , logPath = Attr "exception" (TL.pack (show se)) (logPath log')
+                 , logMessage = "Got synchronous exception in Di Writer. The \
+                                \Log that couldn't be written will be rendered \
+                                \here afterwards, using the fallback Di Writer."
+                 }
+              writeFallback log'
            k
 
 -- | Log a message with the given importance @level@.
@@ -120,7 +129,7 @@ mkDi name (Writer getWrite) = liftIO $ do
 -- logged, then call 'flush' afterwards.
 --
 -- /Note:/ No exceptions from the underlying logging backend (i.e., the 'IO'
--- action given to 'mkDi') will be thrown from 'log'. Instead, those will be
+-- action given to 'new') will be thrown from 'log'. Instead, those will be
 -- recorded to 'IO.stderr' and ignored.
 log :: (MonadDi m, MonadIO m) => Level -> TL.Text -> m ()
 log l = \m -> ask >>= \di ->

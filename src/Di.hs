@@ -1,10 +1,15 @@
 -- |
 --
--- Import this module as follows:
+-- Import this module __qualified__ as follows:
 --
 -- @
--- import Di (Di)
 -- import qualified Di
+-- @
+--
+-- The /only/ name that you are encouraged to import unqualified is 'MonadDi':
+--
+-- @
+-- import Di (MonadDi)
 -- @
 
 
@@ -12,10 +17,21 @@ module Di
  ( -- * Usage
    -- $usage
    Di
- , flush
+ , new
+
+ , df1
+ , stderr
+ , handle
+
+ , DiT
+ , runDiT
+
+ , MonadDi
  , push
  , attr
  , max
+ , flush
+
  , emergency
  , alert
  , critical
@@ -24,24 +40,25 @@ module Di
  , notice
  , info
  , debug
-   -- * Backends
- , mkDi
  ) where
 
-import Prelude hiding (max, error)
+import Prelude hiding (error, max)
 
 import Di.Core
-  (Di, mkDi, flush, push, attr, max,
+  (MonadDi, DiT, runDiT, new, flush, push, attr, max,
    emergency, alert, critical, error, warning, notice, info, debug)
+import Di.Df1 (df1)
+import Di.Types (Di)
+import Di.Writer (stderr, handle)
 
 
 -- $usage
 --
 -- First, read the documentation for the 'Di' datatype.
 --
--- Second, create a base 'Di' value. You will achieve this by using 'mkDi' or,
--- more likely, one of the ready-made 'B.mkDiStringStderr',
--- 'B.mkDiStringHandle', etc.
+-- Second, create a base 'Di' value. You will achieve this by using 'new' or,
+-- more likely, one of the ready-made 'B.newStringStderr',
+-- 'B.newStringHandle', etc.
 --
 -- At this point, you can start logging messages using 'log'. However, things
 -- can be made more interesting.

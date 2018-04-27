@@ -1,15 +1,20 @@
 {-# LANGUAGE StandaloneDeriving #-}
 
 module Di.Types
- ( Log(Log, logTime, logLevel, logPath, logMessage)
+ ( Log(Log)
+ , logTime, logLevel, logPath, logMessage
  , Level(Debug, Info, Notice, Warning, Error, Critical, Alert, Emergency)
  , Path(Attr, Push, Root)
- , Di(Di, diMax, diPath, diLogs)
- , Writer(Writer)
+ , Di(Di)
+ , diMax, diPath, diLogs
+ , Writer(Writer, unWriter)
+ , LogRenderer(TextLogRenderer, BytesLogRenderer)
  ) where
 
 import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
+import qualified Data.Text.Lazy.Builder as TB
+import qualified Data.ByteString.Builder as BB
 import qualified Data.Time.Clock.System as Time
 import Control.Concurrent.STM (TQueue)
 
@@ -72,10 +77,23 @@ data Path
 
 -- | A 'Writer' describes how a 'Log' is fully written (i.e., commited) to the
 -- outside world.
-newtype Writer = Writer (IO (Log -> IO ()))
+newtype Writer = Writer { unWriter :: IO (Log -> IO ()) }
   -- ^ The outer 'IO' is run once by 'mkDi' to initialize anything that needs
   -- to be initialized in order for the actual writing function @'Log' -> 'IO'
   -- ()@ to work properly.
+
+--------------------------------------------------------------------------------
+
+-- | A 'LogRenderer' describes how to render a 'Log' as a blob of text or bytes.
+data LogRenderer
+  = TextLogRenderer !(Bool -> Log -> TB.Builder)
+  -- ^ Render a 'Log' as text. The returned 'TB.Builder' shouldn't include a
+  -- trailing newline. The given 'Bool' tells whether ANSI terminal colors are
+  -- supported.
+  | BytesLogRenderer !(Bool -> Log -> BB.Builder)
+  -- ^ Render a 'Log' as bytes. The returned 'BB.Builder' shouldn't include a
+  -- trailing newline. The given 'Bool' tells whether ANSI terminal colors are
+  -- supported.
 
 --------------------------------------------------------------------------------
 
