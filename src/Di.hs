@@ -12,24 +12,27 @@ module Di
  ( -- * Usage
    -- $usage
    Di
- , log
  , flush
  , push
- , filter
- , contralevel
- , contrapath
- , contramsg
+ , attr
+ , max
+ , emergency
+ , alert
+ , critical
+ , error
+ , warning
+ , notice
+ , info
+ , debug
    -- * Backends
  , mkDi
- , B.mkDiStringStderr
- , B.mkDiStringHandle
  ) where
 
-import Prelude hiding (filter, log)
+import Prelude hiding (max, error)
 
 import Di.Core
-  (Di, log, flush, push, filter, contralevel, contrapath, contramsg, mkDi)
-import qualified Di.Backend as B
+  (Di, mkDi, flush, push, attr, max,
+   emergency, alert, critical, error, warning, notice, info, debug)
 
 
 -- $usage
