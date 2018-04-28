@@ -7,7 +7,7 @@ mkDerivation {
   version = "0.2";
   src = ./.;
   libraryHaskellDepends = [
-    base mtl stm text time transformers unix
+    base bytestring mtl stm text time transformers unix
   ];
   testHaskellDepends = [
     base bytestring QuickCheck stm tasty tasty-hunit tasty-quickcheck
