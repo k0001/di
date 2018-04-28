@@ -18,7 +18,7 @@ library
   hs-source-dirs: src
   default-language: Haskell2010
   exposed-modules: Di Di.Df1
-  other-modules: Di.Core Di.Misc Di.Types Di.Writer
+  other-modules: Di.Misc Di.Types Di.Sink
   build-depends:
     base >=4.9 && <5.0,
     bytestring,

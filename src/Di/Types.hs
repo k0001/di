@@ -2,15 +2,13 @@
 {-# LANGUAGE StandaloneDeriving #-}
 
 module Di.Types
- ( Log(Log)
- , logTime, logLevel, logPath, logMessage
+ ( Log(Log, logTime, logLevel, logPath, logMessage)
  , Level(Debug, Info, Notice, Warning, Error, Critical, Alert, Emergency)
  , Path(Attr, Push, Root)
  , pathRoot
- , Di(Di)
- , diMax, diPath, diLogs
- , Writer(Writer, initWriter)
- , writerOnSyncException
+ , Di(Di, diMax, diPath, diLogs)
+ , SinkInit(SinkInit, runSinkInit)
+ , Sink(Sink, sinkRun, sinkClose)
  , LogRenderer(TextLogRenderer, BytesLogRenderer)
  ) where
 
@@ -87,39 +85,21 @@ pathRoot (Root x) = Root x
 
 --------------------------------------------------------------------------------
 
--- | A 'Writer' describes how a 'Log' is fully written (i.e., commited) to the
--- outside world.
-newtype Writer = Writer { initWriter :: IO (Log -> IO ()) }
+-- | A 'SinkInit' initializes a 'Sink'.
+newtype SinkInit = SinkInit { runSinkInit :: IO Sink }
   -- ^ The outer 'IO' is run once by 'mkDi' to initialize anything that needs
   -- to be initialized in order for the actual writing function @'Log' -> 'IO'
   -- ()@ to work properly.
 
--- | Wraps a desired 'Writer' so that if it throws a synchronous exception, a
--- fallback 'Writer' will attempt to log the same log message afterwards.
---
--- Notice that exceptions from the fallback writer itself are not handled.
-writerOnSyncException
-  :: Writer  -- ^ Desired writer.
-  -> Writer  -- ^ Fallback writer.
-  -> Writer
-writerOnSyncException desired fallback = Writer $ do
-  wF <- initWriter fallback
-  wD <- initWriter desired
-  pure $ \log' -> do
-    catchSync (wD log') $ \se -> do
-     syst <- Time.getSystemTime
-     Ex.finally (wF (fallbackLog syst se log')) (wF log')
- where
-  fallbackLog :: Time.SystemTime -> Ex.SomeException -> Log -> Log
-  fallbackLog syst se log' = Log
-    { logTime = syst, logLevel = Error
-    , logPath = Attr "exception"
-        (TL.pack (Ex.displayException se)) (pathRoot (logPath log'))
-    , logMessage =
-        "Got synchronous exception in desired Di Writer. The \
-        \log message that couldn't be written as desired will \
-        \be rendered here afterwards as a fallback."
-    }
+-- | A 'Sink' describes how a 'Log' is fully written (i.e., commited) to the
+-- outside world.
+data Sink = Sink
+  { sinkRun :: !(Log -> IO ())
+    -- ^ Commit a 'Log' to the outside world.
+  , sinkClose :: !(IO ())
+    -- ^ Close any resources associated with the Sink that were previously
+    -- initialized by the related 'SinkInit'.
+  }
 
 --------------------------------------------------------------------------------
 
