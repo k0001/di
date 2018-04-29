@@ -4,19 +4,26 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Di.Sink
- ( sinkFallback
- , stderr
- , handle
+ ( Sink(Sink)
+ , withSink
+ , sinkFallback
+ , stderrLines
+ , handleLines
+ , handleBlob
  ) where
 
+import Control.Concurrent (MVar, newMVar, modifyMVar, modifyMVar_)
 import qualified Control.Exception as Ex
 import qualified Data.ByteString.Builder as BB
+import qualified Data.List as List
+import qualified Data.Map.Strict as Map
 import Data.Monoid ((<>))
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.IO as TL
 import qualified Data.Text.Lazy.Builder as TB
 import qualified Data.Time.Clock.System as Time
 import qualified System.IO as IO
+import System.IO.Unsafe (unsafePerformIO)
 
 #ifdef VERSION_unix
 import qualified System.Posix.Terminal
@@ -25,8 +32,9 @@ import qualified System.Posix.IO
 
 import Di.Types
   (Log(Log,  logTime, logLevel, logPath, logMessage),
-   SinkInit(SinkInit), Sink(Sink, sinkRun, sinkClose),
-   LogRenderer(TextLogRenderer, BytesLogRenderer),
+   LogLineRenderer(LogLineRendererUtf8),
+   LogBlobRenderer(LogBlobRenderer),
+   RenderMode(RenderModeUtf8, RenderModeBlob),
    Level(Error),
    Path(Attr), pathRoot)
 import Di.Misc (catchSync)
@@ -45,13 +53,13 @@ sinkFallback
   :: Sink  -- ^ Desired sink.
   -> Sink  -- ^ Fallback sink.
   -> Sink
-sinkFallback (Sink rD cD) (Sink rF cF) = Sink
-    { sinkRun = \log' -> do
-        catchSync (rD log') $ \se -> do
-           syst <- Ex.onException Time.getSystemTime (rF log')
-           Ex.finally (rF (fallbackLog syst se log')) (rF log')
-    , sinkClose = Ex.finally cD cF
-    }
+sinkFallback (Sink md) (Sink mf) = Sink $ do
+    (cf, wf) <- mf
+    (cd, wd) <- Ex.onException md cf
+    pure $ (,) (Ex.onException cd cf) $ \log' -> do
+       catchSync (wd log') $ \se -> do
+          syst <- Time.getSystemTime `Ex.onException` wf log'
+          Ex.finally (wf (fallbackLog syst se log')) (wf log')
   where
     fallbackLog :: Time.SystemTime -> Ex.SomeException -> Log -> Log
     fallbackLog syst se log' = Log
@@ -66,45 +74,66 @@ sinkFallback (Sink rD cD) (Sink rF cF) = Sink
 
 --------------------------------------------------------------------------------
 
--- | 'Log's are written to 'IO.Handle', each one followed by a newline
--- (@'\\n'@).
-handle
-  :: IO.Handle
-  -- ^ Handle where to write 'Log's.
-  -> LogRenderer
-  -- ^ How to render each 'Log'.
-  --
-  -- If a 'TextLogRenderer' is given, then the 'IO.Handle''s locale encoding is
-  -- used.
-  --
-  -- If a 'BytesLogRenderer' is given, then it is rendered as is.
-  -> SinkInit
-handle h (TextLogRenderer frender) = SinkInit $ do
-  IO.hSetBinaryMode h False
-  IO.hSetBuffering h (IO.BlockBuffering Nothing)
-  !render <- frender <$> isTty h
-  pure $ Sink
-    { sinkRun = \log' -> do
-         Ex.finally
-            (TL.hPutStr h (TB.toLazyText (render log' <> TB.singleton '\n')))
-            (IO.hFlush h)
-    , sinkClose = pure () }
-handle h (BytesLogRenderer frender) = SinkInit $ do
-  IO.hSetBinaryMode h True
-  IO.hSetBuffering h (IO.BlockBuffering Nothing)
-  !render <- frender <$> isTty h
-  pure $ Sink
-    { sinkRun = \log' -> do
-         Ex.finally
-            (BB.hPutBuilder h (render log' <> BB.char7 '\n'))
-            (IO.hFlush h)
-    , sinkClose = pure () }
+newtype Sink = Sink { unSink :: IO (IO (), (Log -> IO ())) }
 
--- | 'Log's are written to 'IO.stderr' using 'IO.stderr''s locale encoding.
-stderr
-  :: LogRenderer -- ^ How to render each 'Log' line.
-  -> SinkInit
-stderr = handle IO.stderr
+-- | Obtain a “'Log' writing” function from a 'Sink'.
+--
+-- Any resources acquired during 'Sink' initialization are released afterwards.
+--
+-- The @'Log' -> 'IO' ()@ could throw exceptions.
+withSink :: Sink -> ((Log -> IO ()) -> IO a) -> IO a
+withSink (Sink acq) k = Ex.bracket acq fst (k . snd)
+
+--------------------------------------------------------------------------------
+
+-- | This very ugly gobal keeps track of 'IO.Handle's currently being used by
+-- 'handleBlob', so that we don't try and use a same handle more than once,
+-- which would cause output to be garbled.
+mvHandles :: MVar [IO.Handle]
+mvHandles = unsafePerformIO (newMVar [])
+{-# NOINLINE mvHandles #-}
+
+data HandleBusy = HandleBusy !IO.Handle deriving (Show)
+instance Ex.Exception HandleBusy
+
+-- | Like 'handleBlob', but each 'Log' is rendered as text in its own line.
+--
+-- If the given 'IO.Handle' is associated to a TTY supporting ANSI colors, and
+-- the given 'LogLineRenderer' supports rendering with colors, then you will get
+-- colorful output.
+handleLines
+  :: IO.Handle -- ^ Handle where to write 'Log's.
+  -> LogLineRenderer -- ^ How to render each 'Log'.
+  -> Sink
+handleLines h (LogLineRendererUtf8 render0) = Sink $ do
+  !render1 <- render0 <$> isTty h
+  let !newline = BB.char7 '\n'
+      render2 = \log -> render1 log <> newline
+  unSink (handleBlob h (LogBlobRenderer render2))
+
+-- | Write 'Log's to a 'IO.Handle' as a binary blob.
+handleBlob
+  :: IO.Handle -- ^ Handle where to write 'Log's.
+  -> LogBlobRenderer -- ^ How to render each 'Log'.
+  -> Sink
+handleBlob h (LogBlobRenderer render) = Sink $ do
+  modifyMVar mvHandles $ \hs ->
+     case List.elem h hs of
+       True -> Ex.throwIO (HandleBusy h)
+       False -> do
+          IO.hSetBinaryMode h True
+          let !hs' = h : hs
+              close = modifyMVar_ mvHandles (pure . List.delete h)
+              act = \x -> Ex.finally (BB.hPutBuilder h (render x)) (IO.hFlush h)
+          pure (hs', (close, act))
+
+-- | 'Log's are written to 'IO.stderr',
+--
+-- TODO: Currently this *always* renders as UTF-8.
+stderrLines
+  :: LogLineRenderer -- ^ How to render each 'Log' line.
+  -> Sink
+stderrLines = handleLines IO.stderr
 
 --------------------------------------------------------------------------------
 

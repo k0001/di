@@ -29,15 +29,14 @@
 
 
 module Di
- ( -- * Usage
-   -- $usage
-   Di
+ ( Di
  , new
+ , new'
 
    -- * Sinks
  , df1
- , stderr
- , handle
+ , stderrLines
+ , handleLines
 
    -- * 'DiT'
  , DiT
@@ -73,8 +72,9 @@ module Di
  , Log(Log, logTime, logLevel, logPath, logMessage)
  , Path(Attr, Push, Root)
  , pathRoot
- , SinkInit(SinkInit, runSinkInit)
- , Sink(Sink, sinkRun, sinkClose)
+ , Sink(Sink)
+ , withSink
+ , sinkFallback
 
  , test
  ) where
@@ -117,108 +117,94 @@ import qualified Data.Text.Lazy as TL
 
 import Di.Df1 (df1)
 import Di.Misc (mute, muteSync, catchSync, getSystemTimeSTM)
-import Di.Sink (stderr, handle, sinkFallback)
+import Di.Sink
+  (Sink(Sink), withSink, stderrLines, handleLines, sinkFallback, withSink)
 import Di.Types
   (Log(Log, logTime, logLevel, logPath, logMessage),
    Level(Debug, Info, Notice, Warning, Error, Critical, Alert, Emergency),
    Path(Attr, Push, Root), pathRoot,
-   Di(Di, diMax, diPath, diLogs),
-   SinkInit(SinkInit, runSinkInit),
-   Sink(Sink, sinkRun, sinkClose))
-
+   Di(Di, diMax, diPath, diLogs))
 -- TODO specify lazy semantics for Log fields
 
 --------------------------------------------------------------------------------
 
--- $usage
---
--- First, read the documentation for the 'Di' datatype.
---
--- Second, create a base 'Di' value. You will achieve this by using 'new' or,
--- more likely, one of the ready-made 'B.newStringStderr',
--- 'B.newStringHandle', etc.
---
--- At this point, you can start logging messages using 'log'. However, things
--- can be made more interesting.
---
--- Your choice of base 'Di' will mandate particular types for the @level@,
--- @path@ and @msg@ arguments to 'Di'. However, these base types are likely to
--- be very general (e.g., 'String'), so quite likely you'll want to use
--- 'contralevel', 'contrapath' and 'contramsg' to make those types more
--- specific. For example, you can use a precise datatype like the following for
--- associating each log message with a particular importance level:
+-- | Create a new 'Di' that writes to 'System.IO.stderr', one log message per
+-- line.
 --
 -- @
--- data Level = Error | Info | Debug
---   deriving ('Show')
+-- 'new' name  ==  'new'' name ('stderrLines' 'df1')
 -- @
 --
--- Now, assuming the your base 'Di' @level@ type is 'String', you can use
--- @'contralevel' 'show'@ to convert your @'Di' 'String' path msg@ to a @'Di'
--- 'Level' path msg@. The same approach applies to @path@ and @msg@ as well,
--- through the 'contrapath' and 'contramsg' functions respectively.
+-- You are supposed to call 'new' _only once per application_, and this one 'Di'
+-- shall be used throughout your application, even concurrently. This ensures
+-- that the order of logged messages is preserved, and that 'System.IO.stderr'
+-- doesn't get garbled with text comming from different sources.
 --
--- /Hint/: If you are building a library, be sure to export your @Level@
--- datatype so that users of your library can 'contralevel' your 'Level'
--- datatype as necessary.
-
---------------------------------------------------------------------------------
-
--- | Build a new 'Di' from a logging function.
+-- @
+-- main :: 'IO' ()
+-- main = 'Di.new' $ \di -> do
+--    something ...
+-- @
 --
--- /Note:/ If the passed in 'IO' function throws a exception, it will be
--- just logged to 'IO.stderr' and then ignored.
-new
+-- /WARNING:/ If you call 'new' more than once, you'll __get an exception__.
+--
+-- /WARNING:/ Library code should never call 'new', instead, it should rely
+-- solely on 'MonadDi' and expect the caller to provide a 'Di' somehow. If
+-- library needs to obtain a concrete 'Di', for example, to call 'runDiT' from
+-- a different thread, then it could get that 'Di' using @'Di.ask' :: 'MonadDi'
+-- m => m 'Di'@, or simply receive as an argument.
+new :: String -> (Di -> IO a) -> IO a
+new name act = new' name (stderrLines df1) act
+
+new'
   :: String -- ^ Root path name.
-  -> SinkInit
+  -> Sink
   -> (Di -> IO a)
   -> IO a
-new name si0 act = do
-   sink :: Sink <- sinkFallback <$> runSinkInit si0 <*> runSinkInit (stderr df1)
-   tqLogs :: TQueue Log <- newTQueueIO
-   -- Start worker thread, restarting in in case of sync exceptions (unlikely).
-   _ <- fix $ \k -> forkFinally (worker sink tqLogs) $ \case
-      Right () -> pure () -- All messages processed and nobody cares anymore.
-      Left se -> case Ex.asyncExceptionFromException se of
-         Just (_ :: Ex.AsyncException) -> Ex.throwIO se
-         Nothing -> k >> pure ()
-   let di = Di Info (Root (TL.pack name)) tqLogs
-   -- Run 'act', logging any unhandled sync exceptions before quiting.
-   Ex.finally
-     (catchSync (act di) $ \se -> do
+new' name sink act =
+  withSink sink $ \write -> do
+    tqLogs :: TQueue Log <- newTQueueIO
+    -- Start worker thread, restarting in in case of sync exceptions (unlikely).
+    _ <- fix $ \k -> forkFinally (worker write tqLogs) $ \case
+       Right () -> pure () -- All messages processed and nobody cares anymore.
+       Left se -> case Ex.asyncExceptionFromException se of
+          Just (_ :: Ex.AsyncException) -> Ex.throwIO se
+          Nothing -> k >> pure ()
+    let di = Di Info (Root (TL.pack name)) tqLogs
+    -- Run 'act', silently flushing and logging any unhandled synchronous
+    -- exceptions afterwards.
+    flip Ex.finally (mute (atomically (flushDi di))) $
+      catchSync (act di) $ \se -> do
          syst <- Ex.onException (Time.getSystemTime) (Ex.throw se)
          -- We mute because it doesn't really matter if this fails.
          mute $ atomically $ writeTQueue tqLogs $ Log
-            { logTime = syst, logLevel = Alert
-            , logPath = Attr "exception"
-                (TL.pack (Ex.displayException se)) (diPath di)
-            , logMessage = "Unhandled exception" }
-         Ex.throw se)
-     (do -- Silently flush and close sink before leaving.
-         mute (atomically (flushDi di))
-         mute (sinkClose sink))
- where
-   worker :: Sink -> TQueue Log -> IO ()
-   worker sink tqLogs = fix $ \k -> do
-     -- The actual writting of the log message is performed by 'io' later.  Here
-     -- we just try to build an IO action that when performed will write the log
-     -- message and remove it from 'tqLogs' afterwards. This is why 'flush'
-     -- works by just checking if 'tqLogs' is empty.
-     eio <- Ex.try $ atomically $ do
-        log' :: Log <- peekTQueue tqLogs
-        pure (Ex.finally (sinkRun sink log')
-                         (atomically (readTQueue tqLogs)))
-     case eio of
-        Left (_ :: Ex.BlockedIndefinitelyOnSTM) -> do
-           -- Nobody writes to 'tqLogs' anymore, so we can just stop.
-           pure ()
-        Right io -> do
-           -- Finally we run the IO action that commits the log message to the
-           -- outside world. Notice that we mute synchronous exceptions because
-           -- 'sink' already includes a fallback printing mechanism, and if
-           -- that fallback fails there's not much else we could do. So we just
-           -- mute synchronous exceptions and move on to the next iteration.
-           muteSync io >> k
+           { logTime = syst, logLevel = Alert
+           , logPath = Attr "exception"
+               (TL.pack (Ex.displayException se)) (diPath di)
+           , logMessage = "Unhandled exception. Logging system will stop now." }
+         Ex.throw se
+  where
+    worker :: (Log -> IO ()) -> TQueue Log -> IO ()
+    worker write tqLogs = fix $ \k -> do
+      -- The actual writting of the log message is performed by 'io' later.
+      -- Here we just try to build an IO action that when performed will write
+      -- the log message and remove it from 'tqLogs' afterwards. This is why
+      -- 'flush' works by just checking if 'tqLogs' is empty.
+      eio <- Ex.try $ atomically $ do
+         log' :: Log <- peekTQueue tqLogs
+         pure (Ex.finally (write log')
+                          (atomically (readTQueue tqLogs)))
+      case eio of
+         Left (_ :: Ex.BlockedIndefinitelyOnSTM) -> do
+            -- Nobody writes to 'tqLogs' anymore, so we can just stop.
+            pure ()
+         Right io -> do
+            -- Finally we run the IO action that commits the log message to the
+            -- outside world. Notice that we mute synchronous exceptions because
+            -- 'sink' already includes a fallback printing mechanism, and if
+            -- that fallback fails there's not much else we could do. So we just
+            -- mute synchronous exceptions and move on to the next iteration.
+            muteSync io >> k
 
 -- | See the docs for 'flush'.
 flushDi :: Di -> STM ()

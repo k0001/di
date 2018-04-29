@@ -7,9 +7,9 @@ module Di.Types
  , Path(Attr, Push, Root)
  , pathRoot
  , Di(Di, diMax, diPath, diLogs)
- , SinkInit(SinkInit, runSinkInit)
- , Sink(Sink, sinkRun, sinkClose)
- , LogRenderer(TextLogRenderer, BytesLogRenderer)
+ , LogLineRenderer(LogLineRendererUtf8)
+ , LogBlobRenderer(LogBlobRenderer)
+ , RenderMode(RenderModeBlob, RenderModeUtf8)
  ) where
 
 import qualified Data.Text as T
@@ -18,11 +18,9 @@ import qualified Data.Text.Lazy.Builder as TB
 import qualified Data.ByteString.Builder as BB
 import qualified Data.Time.Clock.System as Time
 import Control.Concurrent.STM (TQueue)
-import qualified Control.Exception as Ex
-
-import Di.Misc (catchSync)
 
 --------------------------------------------------------------------------------
+
 data Log = Log
   { logTime :: !Time.SystemTime
   , logLevel :: !Level
@@ -85,34 +83,23 @@ pathRoot (Root x) = Root x
 
 --------------------------------------------------------------------------------
 
--- | A 'SinkInit' initializes a 'Sink'.
-newtype SinkInit = SinkInit { runSinkInit :: IO Sink }
-  -- ^ The outer 'IO' is run once by 'mkDi' to initialize anything that needs
-  -- to be initialized in order for the actual writing function @'Log' -> 'IO'
-  -- ()@ to work properly.
-
--- | A 'Sink' describes how a 'Log' is fully written (i.e., commited) to the
--- outside world.
-data Sink = Sink
-  { sinkRun :: !(Log -> IO ())
-    -- ^ Commit a 'Log' to the outside world.
-  , sinkClose :: !(IO ())
-    -- ^ Close any resources associated with the Sink that were previously
-    -- initialized by the related 'SinkInit'.
-  }
+data RenderMode
+  = RenderModeUtf8  -- ^ UTF-8 encoded text.
+  | RenderModeBlob  -- ^ A blob of binary data.
+  deriving (Show)
 
 --------------------------------------------------------------------------------
 
--- | A 'LogRenderer' describes how to render a 'Log' as a blob of text or bytes.
-data LogRenderer
-  = TextLogRenderer !(Bool -> Log -> TB.Builder)
-  -- ^ Render a 'Log' as text. The returned 'TB.Builder' shouldn't include a
-  -- trailing newline. The given 'Bool' tells whether ANSI terminal colors are
-  -- supported.
-  | BytesLogRenderer !(Bool -> Log -> BB.Builder)
-  -- ^ Render a 'Log' as bytes. The returned 'BB.Builder' shouldn't include a
-  -- trailing newline. The given 'Bool' tells whether ANSI terminal colors are
-  -- supported.
+-- | How to render a 'Log' as a line of text.
+data LogLineRenderer
+  = LogLineRendererUtf8 !(Bool -> Log -> BB.Builder)
+  -- ^ The returned bytes must not contain a trailing newline.
+  --
+  -- The 'Bool' tells whether we are trying to write these bytes to a terminal
+  -- that supports ANSI colors.
+
+-- | How to render a 'Log' as a binary blob.
+data LogBlobRenderer = LogBlobRenderer !(Log -> BB.Builder)
 
 --------------------------------------------------------------------------------
 

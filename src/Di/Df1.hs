@@ -5,9 +5,10 @@ module Di.Df1
  ( df1
  ) where
 
+import qualified Data.ByteString.Builder as BB
 import Data.Monoid ((<>))
 import qualified Data.Text.Lazy as TL
-import qualified Data.Text.Lazy.Builder as TB
+import qualified Data.Text.Lazy.Encoding as TL
 import Prelude hiding (log, filter)
 
 import Di.Misc (renderIso8601)
@@ -15,18 +16,18 @@ import Di.Types
  (Log, logTime, logPath, logLevel, logMessage,
   Level(Debug, Info, Notice, Warning, Error, Critical, Alert, Emergency),
   Path(Attr, Push, Root),
-  LogRenderer(TextLogRenderer))
+  LogLineRenderer(LogLineRendererUtf8))
 
 --------------------------------------------------------------------------------
 
 -- | Render in the __df1__ format.
-df1 :: LogRenderer
-{-# INLINE df1 #-}
-df1 = TextLogRenderer $ \case
+df1 :: LogLineRenderer
+df1 = LogLineRendererUtf8 $ \case
   True -> renderLogColor
-  False -> renderLogColor -- TODO
+  False -> renderLogColor -- Should render without color!
+{-# INLINE df1 #-}
 
-renderLogColor :: Log -> TB.Builder
+renderLogColor :: Log -> BB.Builder
 {-# INLINE renderLogColor #-}
 renderLogColor = \x ->
   "\027[0m" <>
@@ -37,7 +38,7 @@ renderLogColor = \x ->
 
 renderPathColor
   :: Path
-  -> TB.Builder
+  -> BB.Builder
 renderPathColor = let c = ansiColor in \case
   Attr k v p ->
      renderPathColor p <> " " <> c Normal Cyan Default <> escapeMeta k <>
@@ -50,9 +51,10 @@ renderPathColor = let c = ansiColor in \case
      c Normal Default Default
 
 -- | Escape metadata such as path names, attribute keys or attribute values.
-escapeMeta :: TL.Text -> TB.Builder
+escapeMeta :: TL.Text -> BB.Builder
 {-# INLINABLE escapeMeta #-}
-escapeMeta t = TB.fromLazyText (TL.concatMap f t)
+-- TODO use encodeUtf8BuilderEscaped
+escapeMeta t = TL.encodeUtf8Builder (TL.concatMap f t)
   where f :: Char -> TL.Text
         f = \case { ' ' -> "%20"; '!'  -> "%21"; '#' -> "%23"; '$' -> "%24";
                     '&' -> "%26"; '\'' -> "%27"; '(' -> "%28"; ')' -> "%29";
@@ -61,17 +63,18 @@ escapeMeta t = TB.fromLazyText (TL.concatMap f t)
                     '@' -> "%40"; '['  -> "%5B"; ']' -> "%5D";
                     x -> TL.singleton x }
 
-escapeMessage :: TL.Text -> TB.Builder
+escapeMessage :: TL.Text -> BB.Builder
 {-# INLINABLE escapeMessage #-}
-escapeMessage t = TB.fromLazyText (TL.concatMap f t)
+-- TODO use encodeUtf8BuilderEscaped
+escapeMessage t = TL.encodeUtf8Builder (TL.concatMap f t)
   where f :: Char -> TL.Text
         f = \case { '\n' -> "\\n"; '\r' -> "\\r"; x -> TL.singleton x }
 
 renderLevelAndMessage
-  :: (Intensity -> Color -> Color -> TB.Builder)
+  :: (Intensity -> Color -> Color -> BB.Builder)
   -> Level
   -> TL.Text
-  -> TB.Builder
+  -> BB.Builder
 {-# INLINABLE renderLevelAndMessage #-}
 renderLevelAndMessage c l m = let m' = escapeMessage m in case l of
   Debug     -> c Normal Default Default <> "DEBUG " <> m'
@@ -95,24 +98,24 @@ ansiColor
   :: Intensity
   -> Color  -- ^ Foreground
   -> Color  -- ^ Background
-  -> TB.Builder
+  -> BB.Builder
 {-# INLINABLE ansiColor #-}
 ansiColor i fg bg =
   "\027[" <> ansiIntensityPart i <> ";" <>
   ansiFgPart fg <> ";" <> ansiBgPart bg <> "m"
 
-ansiIntensityPart :: Intensity -> TB.Builder
+ansiIntensityPart :: Intensity -> BB.Builder
 {-# INLINABLE ansiIntensityPart #-}
 ansiIntensityPart = \case { Normal -> "0"; Strong -> "1" }
 
-ansiFgPart :: Color -> TB.Builder
+ansiFgPart :: Color -> BB.Builder
 {-# INLINABLE ansiFgPart #-}
 ansiFgPart = \case
   { Black -> "30"; Red -> "31"; Green -> "32"; Yellow -> "33";
     Blue -> "34";  Magenta -> "35";  Cyan -> "36";  White -> "37";
     Default -> "39"; }
 
-ansiBgPart :: Color -> TB.Builder
+ansiBgPart :: Color -> BB.Builder
 {-# INLINABLE ansiBgPart #-}
 ansiBgPart = \case
   { Black -> "40"; Red -> "41"; Green -> "42"; Yellow -> "43";
