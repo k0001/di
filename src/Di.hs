@@ -181,7 +181,8 @@ new' name sink act =
            { logTime = syst, logLevel = Alert
            , logPath = Attr "exception"
                (TL.pack (Ex.displayException se)) (diPath di)
-           , logMessage = "Unhandled exception. Logging system will stop now." }
+           , logMessage = "Unhandled exception. \
+                          \Logging system will stop now." }
          Ex.throw se
   where
     worker :: (Log -> IO ()) -> TQueue Log -> IO ()

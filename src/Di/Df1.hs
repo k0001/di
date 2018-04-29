@@ -6,14 +6,15 @@ module Di.Df1
  ) where
 
 import qualified Data.ByteString.Builder as BB
+import Data.Function (fix)
 import Data.Monoid ((<>))
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as TL
-import Prelude hiding (log, filter)
+import Prelude hiding (log, filter, error)
 
 import Di.Misc (renderIso8601)
 import Di.Types
- (Log, logTime, logPath, logLevel, logMessage,
+ (Log(Log),
   Level(Debug, Info, Notice, Warning, Error, Critical, Alert, Emergency),
   Path(Attr, Push, Root),
   LogLineRenderer(LogLineRendererUtf8))
@@ -24,31 +25,55 @@ import Di.Types
 df1 :: LogLineRenderer
 df1 = LogLineRendererUtf8 $ \case
   True -> renderLogColor
-  False -> renderLogColor -- Should render without color!
+  False -> renderLog
 {-# INLINE df1 #-}
 
-renderLogColor :: Log -> BB.Builder
-{-# INLINE renderLogColor #-}
-renderLogColor = \x ->
-  "\027[0m" <>
-  renderIso8601 (logTime x) <> " " <>
-  renderPathColor (logPath x) <> " " <>
-  renderLevelAndMessage ansiColor (logLevel x) (logMessage x) <>
-  "\027[0m"
+-- | Like 'renderLog' but with ANSI colors.
 
-renderPathColor
-  :: Path
-  -> BB.Builder
-renderPathColor = let c = ansiColor in \case
+-- This is rather ugly, but whatever.
+renderLogColor :: Log -> BB.Builder
+{-# INLINABLE renderLogColor #-}
+renderLogColor = \(Log syst lvl path msg) ->
+  let t = renderIso8601 syst <> space
+      pDef = \fg -> renderPathColor fg fgBlue fgCyan path <> fg <> space
+      pRed = renderPathColor fgBlack fgWhite fgWhite path <> fgBlack <> space
+      m = space <> escapeMessage msg <> reset
+  in case lvl of
+      Debug -> reset <> t <> pDef fgDefault <> debug <> m
+      Info -> reset <> t <> pDef fgDefault <> info <> m
+      Notice -> bgDefault <> fgGreen <> t <> pDef fgGreen <> notice <> m
+      Warning -> bgDefault <> fgYellow <> t <> pDef fgYellow <> warning <> m
+      Error -> bgDefault <> fgRed <> t <> pDef fgRed <> error <> m
+      Critical -> bgRed <> fgBlack <> t <> pRed <> fgWhite <> critical <> fgBlack <> m
+      Alert -> bgRed <> fgBlack <> t <> pRed <> fgWhite <> alert <> fgBlack <> m
+      Emergency -> bgRed <> fgBlack <> t <> pRed <> fgWhite <> emergency <> fgBlack <> m
+
+-- | Like 'renderLogColor', but without color.
+renderLog :: Log -> BB.Builder
+{-# INLINABLE renderLog #-}
+renderLog = \(Log syst lvl path msg) ->
+  renderIso8601 syst <> space <> renderPath path <> space <>
+  level lvl <> space <> escapeMessage msg
+
+-- | @'renderPathColor' a b c p@ renders @p@ using @a@ as the default color (for
+-- things like whitespace or attribute values), @b@ as the color for path names,
+-- and @c@ as the color for attribute keys.
+
+-- This is rather ugly, but whatever.
+renderPathColor :: BB.Builder -> BB.Builder -> BB.Builder -> Path -> BB.Builder
+renderPathColor defc pathc keyc = fix $ \f -> \case
   Attr k v p ->
-     renderPathColor p <> " " <> c Normal Cyan Default <> escapeMeta k <>
-     c Normal Default Default <> "=" <> escapeMeta v
-  Push x p ->
-     renderPathColor p <> " " <> c Normal Blue Default <> "/" <>
-     c Normal Blue Default <> escapeMeta x <> c Normal Default Default
-  Root x ->
-     c Normal Blue Default <> "/" <> c Normal Blue Default <> escapeMeta x <>
-     c Normal Default Default
+    f p <> defc <> space <> keyc <> escapeMeta k <>
+    defc <> equals <> escapeMeta v
+  Push x p -> f p <> defc <> space <> pathc <> slash <> escapeMeta x
+  Root x -> pathc <> slash <> escapeMeta x
+
+-- | Like 'renderPathColor', but without color.
+renderPath :: Path -> BB.Builder
+renderPath = fix $ \f -> \case
+  Attr k v p -> f p <> space <> escapeMeta k <> equals <> escapeMeta v
+  Push x p -> f p <> space <> slash <> escapeMeta x
+  Root x -> slash <> escapeMeta x
 
 -- | Escape metadata such as path names, attribute keys or attribute values.
 escapeMeta :: TL.Text -> BB.Builder
@@ -70,54 +95,94 @@ escapeMessage t = TL.encodeUtf8Builder (TL.concatMap f t)
   where f :: Char -> TL.Text
         f = \case { '\n' -> "\\n"; '\r' -> "\\r"; x -> TL.singleton x }
 
-renderLevelAndMessage
-  :: (Intensity -> Color -> Color -> BB.Builder)
-  -> Level
-  -> TL.Text
-  -> BB.Builder
-{-# INLINABLE renderLevelAndMessage #-}
-renderLevelAndMessage c l m = let m' = escapeMessage m in case l of
-  Debug     -> c Normal Default Default <> "DEBUG " <> m'
-  Info      -> c Normal Default Default <> "INFO " <> m'
-  Notice    -> c Normal Green Default <> "NOTICE " <> c Normal Default Default <> m'
-  Warning   -> c Normal Yellow Default <> "WARNING " <> m'
-  Error     -> c Strong Red Default <> "ERROR " <> m'
-  Critical  -> c Strong White Red <> "CRITICAL " <> c Strong Black Red <> m'
-  Alert     -> c Strong White Red <> "ALERT " <> c Strong Black Red <> m'
-  Emergency -> c Strong White Red <> "EMERGENCY " <> c Strong Black Red <> m'
+--------------------------------------------------------------------------------
+-- Some hardcoded stuff we use time and time again
+
+debug :: BB.Builder
+debug = BB.string7 "DEBUG"
+
+info :: BB.Builder
+info = BB.string7 "INFO"
+
+notice :: BB.Builder
+notice = BB.string7 "NOTICE"
+
+warning :: BB.Builder
+warning = BB.string7 "WARNING"
+
+error :: BB.Builder
+error = BB.string7 "ERROR"
+
+critical :: BB.Builder
+critical = BB.string7 "CRITICAL"
+
+alert :: BB.Builder
+alert = BB.string7 "ALERT"
+
+emergency :: BB.Builder
+emergency = BB.string7 "EMERGENCY"
+
+level :: Level -> BB.Builder
+{-# INLINE level #-}
+level = \case
+  { Debug -> debug; Info -> info;
+    Notice -> notice; Warning -> warning;
+    Error -> error; Critical -> critical;
+    Alert -> alert; Emergency -> emergency }
+
+space :: BB.Builder
+space = BB.char7 ' '
+
+slash :: BB.Builder
+slash = BB.char7 '/'
+
+equals :: BB.Builder
+equals = BB.char7 '='
 
 --------------------------------------------------------------------------------
+-- ANSI escape codes
 
-data Intensity
-  = Normal | Strong
+-- | Reset all
+reset :: BB.Builder
+reset = BB.string7 "\x1b[0m"
 
-data Color
-  = Black | Red | Green | Yellow | Blue | Magenta | Cyan | White | Default
+-- | Default foreground
+fgDefault :: BB.Builder
+fgDefault = BB.string7 "\x1b[39m"
 
-ansiColor
-  :: Intensity
-  -> Color  -- ^ Foreground
-  -> Color  -- ^ Background
-  -> BB.Builder
-{-# INLINABLE ansiColor #-}
-ansiColor i fg bg =
-  "\027[" <> ansiIntensityPart i <> ";" <>
-  ansiFgPart fg <> ";" <> ansiBgPart bg <> "m"
+-- | Reset background
+bgDefault :: BB.Builder
+bgDefault = BB.string7 "\x1b[49m"
 
-ansiIntensityPart :: Intensity -> BB.Builder
-{-# INLINABLE ansiIntensityPart #-}
-ansiIntensityPart = \case { Normal -> "0"; Strong -> "1" }
+-- | green foreground
+fgGreen :: BB.Builder
+fgGreen = BB.string7 "\x1b[32m"
 
-ansiFgPart :: Color -> BB.Builder
-{-# INLINABLE ansiFgPart #-}
-ansiFgPart = \case
-  { Black -> "30"; Red -> "31"; Green -> "32"; Yellow -> "33";
-    Blue -> "34";  Magenta -> "35";  Cyan -> "36";  White -> "37";
-    Default -> "39"; }
+-- | green foreground
+fgRed :: BB.Builder
+fgRed = BB.string7 "\x1b[31m"
 
-ansiBgPart :: Color -> BB.Builder
-{-# INLINABLE ansiBgPart #-}
-ansiBgPart = \case
-  { Black -> "40"; Red -> "41"; Green -> "42"; Yellow -> "43";
-    Blue -> "44"; Magenta -> "45"; Cyan -> "46"; White -> "47";
-    Default -> "49" }
+-- | Yellow foreground
+fgYellow :: BB.Builder
+fgYellow = BB.string7 "\x1b[33m"
+
+-- | Cyan foreground
+fgCyan :: BB.Builder
+fgCyan = BB.string7 "\x1b[36m"
+
+-- | Blue foreground
+fgBlue :: BB.Builder
+fgBlue = BB.string7 "\x1b[34m"
+
+-- | Black foreground
+fgBlack :: BB.Builder
+fgBlack = BB.string7 "\x1b[30m"
+
+-- | White foreground
+fgWhite :: BB.Builder
+fgWhite = BB.string7 "\x1b[37m"
+
+-- | Red background
+bgRed :: BB.Builder
+bgRed = BB.string7 "\x1b[41m"
+
