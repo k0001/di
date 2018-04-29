@@ -170,7 +170,7 @@ new' name sink act =
        Left se -> case Ex.asyncExceptionFromException se of
           Just (_ :: Ex.AsyncException) -> Ex.throwIO se
           Nothing -> k >> pure ()
-    let di = Di Info (Root (TL.pack name)) tqLogs
+    let di = Di Debug (Root (TL.pack name)) tqLogs
     -- Run 'act', silently flushing and logging any unhandled synchronous
     -- exceptions afterwards.
     flip Ex.finally (mute (atomically (flushDi di))) $

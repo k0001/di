@@ -47,3 +47,16 @@ test-suite test
     tasty,
     tasty-hunit,
     tasty-quickcheck
+
+executable df1
+  hs-source-dirs: df1
+  main-is: Main.hs
+  default-language: Haskell2010
+  ghc-options: -Wall -threaded -O3
+  build-depends:
+    base,
+    di,
+    optparse-applicative,
+    text,
+    time,
+    QuickCheck

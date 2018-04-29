@@ -1,13 +1,18 @@
-{ mkDerivation, base, bytestring, containers, mtl, QuickCheck
-, stdenv, stm, tasty, tasty-hunit, tasty-quickcheck, text, time
-, transformers, unix
+{ mkDerivation, base, bytestring, containers, mtl
+, optparse-applicative, QuickCheck, stdenv, stm, tasty, tasty-hunit
+, tasty-quickcheck, text, time, transformers, unix
 }:
 mkDerivation {
   pname = "di";
   version = "0.2";
   src = ./.;
+  isLibrary = true;
+  isExecutable = true;
   libraryHaskellDepends = [
     base bytestring containers mtl stm text time transformers unix
+  ];
+  executableHaskellDepends = [
+    base optparse-applicative QuickCheck text time
   ];
   testHaskellDepends = [
     base bytestring QuickCheck stm tasty tasty-hunit tasty-quickcheck

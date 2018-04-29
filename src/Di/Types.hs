@@ -55,7 +55,7 @@ data Level
   -- database.
   | Emergency
   -- ^ System is unusable.
-  deriving (Eq, Show)
+  deriving (Eq, Show, Bounded, Enum)
 
 -- | Order of importance. For example, 'Emergency' is more important than
 -- 'Debug':
