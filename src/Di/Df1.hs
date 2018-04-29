@@ -35,15 +35,15 @@ renderLogColor :: Log -> BB.Builder
 {-# INLINABLE renderLogColor #-}
 renderLogColor = \(Log syst lvl path msg) ->
   let t = renderIso8601 syst <> space
-      pDef = \fg -> renderPathColor fg fgBlue fgCyan path <> fg <> space
-      pRed = renderPathColor fgBlack fgWhite fgWhite path <> fgBlack <> space
+      pDef = \fg -> renderPathColor fg fgBlue fgCyan path <> space
+      pRed = renderPathColor fgBlack fgWhite fgWhite path <> space
       m = space <> escapeMessage msg <> reset
   in case lvl of
-      Debug -> reset <> t <> pDef fgDefault <> debug <> m
-      Info -> reset <> t <> pDef fgDefault <> info <> m
-      Notice -> bgDefault <> fgGreen <> t <> pDef fgGreen <> notice <> m
-      Warning -> bgDefault <> fgYellow <> t <> pDef fgYellow <> warning <> m
-      Error -> bgDefault <> fgRed <> t <> pDef fgRed <> error <> m
+      Debug -> reset <> t <> pDef fgDefault <> fgDefault <> debug <> m
+      Info -> reset <> t <> pDef fgDefault <> fgDefault <> info <> m
+      Notice -> bgDefault <> fgGreen <> t <> pDef fgDefault <> fgGreen <> notice <> m
+      Warning -> bgDefault <> fgYellow <> t <> pDef fgDefault <> fgYellow <> warning <> m
+      Error -> bgDefault <> fgRed <> t <> pDef fgDefault <> fgRed <> error <> m
       Critical -> bgRed <> fgBlack <> t <> pRed <> fgWhite <> critical <> fgBlack <> m
       Alert -> bgRed <> fgBlack <> t <> pRed <> fgWhite <> alert <> fgBlack <> m
       Emergency -> bgRed <> fgBlack <> t <> pRed <> fgWhite <> emergency <> fgBlack <> m
