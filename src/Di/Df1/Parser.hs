@@ -1,8 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Di.Df1.Parser
-
- where
+ ( pLog
+ ) where
 
 import Control.Applicative ((<|>))
 import Control.Monad.Fix (mfix)
@@ -25,6 +25,15 @@ import Di.Types as Di
   Path(Attr, Push, Root))
 
 --------------------------------------------------------------------------------
+
+pLog :: AB.Parser Di.Log
+{-# INLINE pLog #-}
+pLog = (AB.<?> "pLog") $ do
+  t <- AB.skipWhile (== 32) *> pIso8601
+  p <- AB.skipWhile (== 32) *> pPath
+  l <- AB.skipWhile (== 32) *> pLevel
+  m <- AB.skipWhile (== 32) *> pMessage
+  pure (Log (Time.utcToSystemTime t) l p m)
 
 pIso8601 :: AB.Parser Time.UTCTime
 {-# INLINE pIso8601 #-}
@@ -92,33 +101,44 @@ pLevel = (AB.<?> "pLevel") $
 pPath :: AB.Parser Di.Path
 {-# INLINE pPath #-}
 pPath = (AB.<?> "pLevel") $ do
-    pRoot >>= fix (\k a -> ((pAttr a <|> pPush a) >>= k) <|> pure a)
+    pRoot >>= fix (\k path -> ((pPush path <|> pAttr path) >>= k) <|> pure path)
   where
     pRoot :: AB.Parser Di.Path
     pRoot = (AB.<?> "pRoot") $ do
       AB.skip (== 47) AB.<?> "/"
-      key <- pUtf8L =<< (AB.takeWhile1 (/= 32) AB.<?> "key")
+      key <- pUtf8S =<< (AB.takeWhile1 (/= 32) AB.<?> "key")
       pure (Di.Root key)
     pPush :: Di.Path -> AB.Parser Di.Path
     pPush path = (AB.<?> "pPush") $ do
-      AB.skip (== 32) AB.<?> "' '"
+      AB.skipWhile (== 32)  -- space
       AB.skip (== 47) AB.<?> "/"
-      key <- pUtf8L =<< (AB.takeWhile1 (/= 32) AB.<?> "key")
+      key <- pUtf8S =<< (AB.takeWhile1 (/= 32) AB.<?> "key")
       pure (Di.Push key path)
     pAttr :: Di.Path -> AB.Parser Di.Path
     pAttr path = do
-      AB.skip (== 32) AB.<?> "' '"
-      key <- pUtf8L =<< (AB.takeWhile1 (/= 61) AB.<?> "key")
+      AB.skipWhile (== 32) -- space
+      key <- pUtf8S =<< (AB.takeWhile1 (/= 61) AB.<?> "key")
       AB.skip (== 61) AB.<?> "="
-      val <- pUtf8L =<< (AB.takeWhile1 (/= 32) AB.<?> "value")
+      val <- pUtf8S =<< (AB.takeWhile1 (/= 32) AB.<?> "value")
       pure (Di.Attr key val path)
     {-# INLINE pRoot #-}
     {-# INLINE pPush #-}
     {-# INLINE pAttr #-}
 
-pUtf8L :: B.ByteString -> AB.Parser TL.Text
+pMessage :: AB.Parser TL.Text
+pMessage = (AB.<?> "pMessage") $ do
+  -- TODO drop trailing whitespace. Probably do it with Pipes.
+  pUtf8L =<< AB.takeLazyByteString
+
+pUtf8L :: BL.ByteString -> AB.Parser TL.Text
 {-# INLINE pUtf8L #-}
-pUtf8L = \b -> case TL.decodeUtf8' (BL.fromStrict b) of
+pUtf8L = \bl -> case TL.decodeUtf8' bl of
    Right x -> pure x
    Left e -> fail (show e) AB.<?> "pUtf8L"
+
+pUtf8S :: B.ByteString -> AB.Parser TL.Text
+{-# INLINE pUtf8S #-}
+pUtf8S = \b -> case TL.decodeUtf8' (BL.fromStrict b) of
+   Right x -> pure x
+   Left e -> fail (show e) AB.<?> "pUtf8S"
 
