@@ -1,4 +1,4 @@
-{ mkDerivation, base, bytestring, containers, mtl
+{ mkDerivation, attoparsec, base, bytestring, containers, mtl
 , optparse-applicative, QuickCheck, stdenv, stm, tasty, tasty-hunit
 , tasty-quickcheck, text, time, transformers, unix
 }:
@@ -9,7 +9,8 @@ mkDerivation {
   isLibrary = true;
   isExecutable = true;
   libraryHaskellDepends = [
-    base bytestring containers mtl stm text time transformers unix
+    attoparsec base bytestring containers mtl stm text time
+    transformers unix
   ];
   executableHaskellDepends = [
     base optparse-applicative QuickCheck text time

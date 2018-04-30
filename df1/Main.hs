@@ -1,6 +1,9 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings#-}
+
 module Main where
 
+import Control.Monad (forever)
 import qualified Test.QuickCheck as QC
 import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
@@ -12,36 +15,36 @@ import qualified Di
 
 main :: IO ()
 main = do
-  s <- QC.generate genStringShortNice
+  s <- QC.generate genStringShort
   Di.new s $ \di -> do
-      Di.runDiT di =<< QC.generate (fmap (sequence_ . take 100) genMonadDis)
+      Di.runDiT di =<< QC.generate (fmap (sequence_ . take 10000) genMonadDis)
 
 --------------------------------------------------------------------------------
 
-genTextShortNice :: QC.Gen T.Text
-genTextShortNice = do
+genTextShort :: QC.Gen T.Text
+genTextShort = do
   n <- QC.choose (3, 14)
-  xs <- QC.vectorOf n (QC.elements "abcdefghijklmnopqrstuvwxyz")
+  xs <- QC.vectorOf n (QC.elements "abcdefghijklmnopqrstuvwxyz1234567890-=+_(\n\r\\'\"*&^%$#@!,.[]")
   pure (T.pack xs)
 
-genTextLShortNice :: QC.Gen TL.Text
-genTextLShortNice = fmap TL.fromStrict genTextShortNice
+genTextLShort :: QC.Gen TL.Text
+genTextLShort = fmap TL.fromStrict genTextShort
 
-genStringShortNice :: QC.Gen String
-genStringShortNice = fmap T.unpack genTextShortNice
+genStringShort :: QC.Gen String
+genStringShort = fmap T.unpack genTextShort
 
 genPathNext :: Di.Path -> QC.Gen Di.Path
 genPathNext p0 = case p0 of
   Di.Root _ -> QC.frequency
-    [ (3, Di.Push <$> genTextLShortNice <*> pure p0)
-    , (2, Di.Attr <$> genTextLShortNice <*> genTextLShortNice <*> pure p0) ]
+    [ (3, Di.Push <$> genTextLShort <*> pure p0)
+    , (2, Di.Attr <$> genTextLShort <*> genTextLShort <*> pure p0) ]
   Di.Push _ p -> QC.frequency
-    [ (3, Di.Push <$> genTextLShortNice <*> pure p0)
-    , (2, Di.Attr <$> genTextLShortNice <*> genTextLShortNice <*> pure p0)
+    [ (3, Di.Push <$> genTextLShort <*> pure p0)
+    , (2, Di.Attr <$> genTextLShort <*> genTextLShort <*> pure p0)
     , (1, pure p) ]
   Di.Attr _ _ p -> QC.frequency
-    [ (3, Di.Push <$> genTextLShortNice <*> pure p0)
-    , (2, Di.Attr <$> genTextLShortNice <*> genTextLShortNice <*> pure p0)
+    [ (3, Di.Push <$> genTextLShort <*> pure p0)
+    , (2, Di.Attr <$> genTextLShort <*> genTextLShort <*> pure p0)
     , (1, pure p) ]
 
 -- | Infinite list.
@@ -51,7 +54,7 @@ genPaths = iterateM genPathNext =<< genPath
 genPath :: QC.Gen Di.Path
 genPath = do
   n <- QC.choose (0, 10)
-  paths <- genTextLShortNice >>= \t -> iterateM genPathNext (Di.Root t)
+  paths <- genTextLShort >>= \t -> iterateM genPathNext (Di.Root t)
   pure (paths !! n)
 
 genSystemTime :: QC.Gen Time.SystemTime
@@ -82,14 +85,14 @@ genLevel = QC.frequency
   , (1,  pure Di.Emergency) ]
 
 genLog :: QC.Gen Di.Log
-genLog = Di.Log <$> genSystemTime <*> genLevel <*> genPath <*> genTextLShortNice
+genLog = Di.Log <$> genSystemTime <*> genLevel <*> genPath <*> genTextLShort
 
 genLogNewer :: Di.Log -> QC.Gen Di.Log
 genLogNewer l0 = Di.Log
   <$> genSystemTimeSoonAfter (Di.logTime l0)
   <*> genLevel
   <*> genPathNext (Di.logPath l0)
-  <*> genTextLShortNice
+  <*> genTextLShort
 
 -- | Infinite list.
 genLogsNewer :: QC.Gen [Di.Log]
@@ -97,15 +100,15 @@ genLogsNewer = iterateM genLogNewer =<< genLog
 
 genMonadDi :: Di.MonadDi m => QC.Gen (m ())
 genMonadDi = QC.frequency
-  [ (1, Di.push <$> genTextShortNice <*> genMonadDi)
-  , (2, Di.attr <$> genTextShortNice <*> genTextShortNice <*> genMonadDi)
-  , (7, Di.log <$> genLevel <*> genTextLShortNice) ]
+  [ (1, Di.push <$> genTextShort <*> genMonadDi)
+  , (2, Di.attr <$> genTextShort <*> genTextShort <*> genMonadDi)
+  , (7, Di.log <$> genLevel <*> genTextLShort) ]
 
 genMonadDiNext :: Di.MonadDi m => m () -> QC.Gen (m ())
 genMonadDiNext m0 = (m0 >>) <$> QC.frequency
-  [ (1, Di.push <$> genTextShortNice <*> genMonadDi)
-  , (2, Di.attr <$> genTextShortNice <*> genTextShortNice <*> genMonadDi)
-  , (7, Di.log <$> genLevel <*> genTextLShortNice) ]
+  [ (1, Di.push <$> genTextShort <*> genMonadDi)
+  , (2, Di.attr <$> genTextShort <*> genTextShort <*> genMonadDi)
+  , (7, Di.log <$> genLevel <*> genTextLShort) ]
 
 -- | Infinite list.
 genMonadDis :: Di.MonadDi m => QC.Gen [m ()]

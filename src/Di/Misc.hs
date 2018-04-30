@@ -10,6 +10,7 @@ module Di.Misc
  , muteSync
  , mute
  , getSystemTimeSTM
+ , iterateM
  ) where
 
 import Control.Concurrent.STM (STM)
@@ -73,6 +74,12 @@ _zero5 = BB.string7 "00000"
 _zero6 = BB.string7 "000000"
 _zero7 = BB.string7 "0000000"
 _zero8 = BB.string7 "00000000"
+
+--------------------------------------------------------------------------------
+
+iterateM :: Monad m => (a -> m a) -> a -> m [a]
+{-# INLINE iterateM #-}
+iterateM f a = f a >>= \a' -> iterateM f a' >>= \as' -> pure (a' : as')
 
 --------------------------------------------------------------------------------
 

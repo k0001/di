@@ -124,7 +124,71 @@ import Di.Types
    Level(Debug, Info, Notice, Warning, Error, Critical, Alert, Emergency),
    Path(Attr, Push, Root), pathRoot,
    Di(Di, diMax, diPath, diLogs))
--- TODO specify lazy semantics for Log fields
+
+{-
+TODO Specify lazy semantics for Log fields. E.g., logging a message containing
+`undefined` should be caught gracefuly inside di.
+
+TODO Tests for lazy semantics.
+
+TODO Mask/restore for filtering? Consider how practical this would be.
+
+TODO Query language.
+
+TODO Test STM semantics (e.g, STM.retry and `runDiT' id`)
+
+TODO Consider DF1 (time, level, path, ...) order rather than (time, path,
+level...)? Consider the UX with and without colors, and command-line tooling
+support aspects.
+
+TODO Switch for forcing colors off in handleLines.
+
+TODO DF1 Parser (should cope with ANSI color escape stuff in input).
+
+TODO DF1 roundtrip tests.
+
+TODO DF1 rendering tests comparing with reference bytes.
+
+TODO Rendering LogLineRendererUtf8 to non UTF-8 handles.
+
+TODO Message metadata in log entries. Idea:
+
+   data Message = Message
+     { messageText :: !TL.Text
+     , messageMeta :: ![(Key, Value)]
+     }
+
+   instance IsString Message where
+     fromString s = Message (TL.pack s) []
+
+   log :: MonadDi m => Message -> m ()
+
+TODO A new `Message x` class for obtaining text and metadata to be rendered
+from `x`? Changes to `log`?
+
+   class ToMessage x where
+     toMessage :: x -> Message
+     default toMessage :: Typeable x => Message
+     toMessage = Message constructorName fieldStringyThings
+
+   class ToMessage String where
+     toMessage s = Message (TL.pack s) []
+
+   class ToMessage TL.Text where
+     toMessage t = Message t []
+
+   class ToMessage T.Text where
+     toMessage t = Message (TL.fromStrict t) []
+
+   newtype MyThingHappened = MyThingHappened { myThing_userId :: !Int }
+   class ToMessage MyThing where
+     toMessage (MyThing x) = Message "The thing happened" [("user-id", x)]
+
+   -- This one has terrible type inferrence with OverloadedStrings.
+   log' :: (MonadDi m, ToMessage a) => a -> m ()
+
+TODO Rename MonadDi to MonadLog, DiT to LogT, Log to Request?
+-}
 
 --------------------------------------------------------------------------------
 
