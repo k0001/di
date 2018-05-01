@@ -3,19 +3,25 @@
 
 module Di.Types
  ( Log(Log, logTime, logLevel, logPath, logMessage)
+ , Message(Message)
  , Level(Debug, Info, Notice, Warning, Error, Critical, Alert, Emergency)
  , Path(Attr, Push, Root)
+ , Segment(Segment)
+ , Key(Key)
+ , Value(Value)
  , pathRoot
  , Di(Di, diMax, diPath, diLogs)
+ , LogLineParser(LogLineParserUtf8)
  , LogLineRenderer(LogLineRendererUtf8)
  , LogBlobRenderer(LogBlobRenderer)
- , RenderMode(RenderModeBlob, RenderModeUtf8)
  ) where
 
+import qualified Data.Attoparsec.ByteString as AB
+import qualified Data.ByteString.Builder as BB
+import Data.Semigroup (Semigroup)
 import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
-import qualified Data.Text.Lazy.Builder as TB
-import qualified Data.ByteString.Builder as BB
+import Data.String (IsString(fromString))
 import qualified Data.Time.Clock.System as Time
 import Control.Concurrent.STM (TQueue)
 
@@ -25,8 +31,34 @@ data Log = Log
   { logTime :: !Time.SystemTime
   , logLevel :: !Level
   , logPath :: !Path
-  , logMessage :: !TL.Text
+  , logMessage :: !Message
   } deriving (Eq, Show)
+
+--------------------------------------------------------------------------------
+
+-- | A message text.
+--
+-- If you have the @OverloadedStrings@ GHC extension enabled, you can build a
+-- 'Message' using a string literal:
+--
+-- @
+-- \"foo\" :: 'Message'
+-- @
+--
+-- Otherwise, you can use 'fromString' or the 'Message' constructor directly.
+newtype Message = Message TL.Text
+  deriving (Eq, Show)
+
+instance IsString Message where
+  fromString = Message . TL.pack
+  {-# INLINE fromString #-}
+
+instance Semigroup Message
+instance Monoid Message where
+  mempty = Message mempty
+  {-# INLINE mempty #-}
+  mappend (Message a) (Message b) = Message (mappend a b)
+  {-# INLINE mappend #-}
 
 --------------------------------------------------------------------------------
 
@@ -67,12 +99,90 @@ deriving instance Ord Level
 
 --------------------------------------------------------------------------------
 
+-- | A path segment.
+--
+-- If you have the @OverloadedStrings@ GHC extension enabled, you can build a
+-- 'Segment' using a string literal:
+--
+-- @
+-- \"foo\" :: 'Segment'
+-- @
+--
+-- Otherwise, you can use 'fromString' or the 'Segment' constructor directly.
+newtype Segment = Segment T.Text
+  deriving (Eq, Show)
+
+instance IsString Segment where
+  fromString = Segment . T.pack
+  {-# INLINE fromString #-}
+
+instance Semigroup Segment
+instance Monoid Segment where
+  mempty = Segment mempty
+  {-# INLINE mempty #-}
+  mappend (Segment a) (Segment b) = Segment (mappend a b)
+  {-# INLINE mappend #-}
+
+--------------------------------------------------------------------------------
+
+-- | An attribute key (see 'Attr').
+--
+-- If you have the @OverloadedStrings@ GHC extension enabled, you can build a
+-- 'Key' using a string literal:
+--
+-- @
+-- \"foo\" :: 'Key'
+-- @
+--
+-- Otherwise, you can use 'fromString' or the 'Key' constructor directly.
+newtype Key = Key T.Text
+  deriving (Eq, Show)
+
+instance IsString Key where
+  fromString = Key . T.pack
+  {-# INLINE fromString #-}
+
+instance Semigroup Key
+instance Monoid Key where
+  mempty = Key mempty
+  {-# INLINE mempty #-}
+  mappend (Key a) (Key b) = Key (mappend a b)
+  {-# INLINE mappend #-}
+
+--------------------------------------------------------------------------------
+
+-- | An attribute value (see 'Attr').
+--
+-- If you have the @OverloadedStrings@ GHC extension enabled, you can build a
+-- 'Value' using a string literal:
+--
+-- @
+-- \"foo\" :: 'Value'
+-- @
+--
+-- Otherwise, you can use 'fromString' or the 'Value' constructor directly.
+newtype Value = Value TL.Text
+  deriving (Eq, Show)
+
+instance IsString Value where
+  fromString = Value . TL.pack
+  {-# INLINE fromString #-}
+
+instance Semigroup Value
+instance Monoid Value where
+  mempty = Value mempty
+  {-# INLINE mempty #-}
+  mappend (Value a) (Value b) = Value (mappend a b)
+  {-# INLINE mappend #-}
+
+--------------------------------------------------------------------------------
+
 -- We keep the strings as lazy 'TL.Text', even if short, so that we avoid
 -- calling 'TL.fromStrict' time and time again when rendering this 'Path'.
 data Path
-  = Root !TL.Text
-  | Push !TL.Text !Path
-  | Attr !TL.Text !TL.Text !Path
+  = Root !Segment
+  | Push !Segment !Path
+  | Attr !Key !Value !Path
   deriving (Eq, Show)
 
 -- | Finds the 'Root' of a 'Path'.
@@ -83,10 +193,10 @@ pathRoot (Root x) = Root x
 
 --------------------------------------------------------------------------------
 
-data RenderMode
-  = RenderModeUtf8  -- ^ UTF-8 encoded text.
-  | RenderModeBlob  -- ^ A blob of binary data.
-  deriving (Show)
+-- | How to parse a 'Log' from a line of text.
+data LogLineParser
+  = LogLineParserUtf8 !(AB.Parser Log)
+  -- ^ Parse a 'Log' from some UTF-8 bytes.
 
 --------------------------------------------------------------------------------
 

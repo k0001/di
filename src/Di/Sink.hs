@@ -16,11 +16,8 @@ import Control.Concurrent (MVar, newMVar, modifyMVar, modifyMVar_)
 import qualified Control.Exception as Ex
 import qualified Data.ByteString.Builder as BB
 import qualified Data.List as List
-import qualified Data.Map.Strict as Map
 import Data.Monoid ((<>))
 import qualified Data.Text.Lazy as TL
-import qualified Data.Text.Lazy.IO as TL
-import qualified Data.Text.Lazy.Builder as TB
 import qualified Data.Time.Clock.System as Time
 import qualified System.IO as IO
 import System.IO.Unsafe (unsafePerformIO)
@@ -31,12 +28,9 @@ import qualified System.Posix.IO
 #endif
 
 import Di.Types
-  (Log(Log,  logTime, logLevel, logPath, logMessage),
-   LogLineRenderer(LogLineRendererUtf8),
-   LogBlobRenderer(LogBlobRenderer),
-   RenderMode(RenderModeUtf8, RenderModeBlob),
-   Level(Error),
-   Path(Attr), pathRoot)
+  (Log(Log,  logTime, logLevel, logPath, logMessage), Level(Error),
+   LogLineRenderer(LogLineRendererUtf8), LogBlobRenderer(LogBlobRenderer),
+   Path(Attr), pathRoot, Key(Key), Value(Value))
 import Di.Misc (catchSync)
 
 --------------------------------------------------------------------------------
@@ -64,10 +58,12 @@ sinkFallback (Sink md) (Sink mf) = Sink $ do
     fallbackLog :: Time.SystemTime -> Ex.SomeException -> Log -> Log
     fallbackLog syst se log' = Log
       { logTime = syst, logLevel = Error
-      , logPath = Attr "exception"
-          (TL.pack (Ex.displayException se)) (pathRoot (logPath log'))
+      , logPath = Attr
+          (Key "exception")
+          (Value (TL.pack (Ex.displayException se)))
+          (pathRoot (logPath log'))
       , logMessage =
-          "Got synchronous exception in desired Di Sink. The "  <>
+          "Got synchronous exception in desired Di Sink. The " <>
           "log message that couldn't be written as desired will " <>
           "be rendered here afterwards as a fallback."
       }
@@ -108,7 +104,7 @@ handleLines
 handleLines h (LogLineRendererUtf8 render0) = Sink $ do
   !render1 <- render0 <$> isTty h
   let !newline = BB.char7 '\n'
-      render2 = \log -> render1 log <> newline
+      render2 = \log' -> render1 log' <> newline
   unSink (handleBlob h (LogBlobRenderer render2))
 
 -- | Write 'Log's to a 'IO.Handle' as a binary blob.

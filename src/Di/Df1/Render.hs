@@ -1,8 +1,10 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Di.Df1.Render
- ( df1
+ ( renderLog
+ , renderLogColor
  ) where
 
 import qualified Data.ByteString.Builder as BB
@@ -11,49 +13,46 @@ import Data.Function (fix)
 import Data.Monoid ((<>))
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as TL
-import Data.Word (Word8)
+import qualified Data.Time as Time
+import qualified Data.Time.Clock.System as Time
+import Data.Word (Word8, Word32)
 import Prelude hiding (log, filter, error)
 
-import Di.Misc (renderIso8601)
 import Di.Types
- (Log(Log),
+ (Log(Log), Message(Message),
   Level(Debug, Info, Notice, Warning, Error, Critical, Alert, Emergency),
-  Path(Attr, Push, Root),
-  LogLineRenderer(LogLineRendererUtf8))
+  Path(Attr, Push, Root), Segment(Segment), Key(Key), Value(Value))
 
 --------------------------------------------------------------------------------
 
--- | Render in the __df1__ format.
-df1 :: LogLineRenderer
-df1 = LogLineRendererUtf8 $ \case
-  True -> renderLogColor
-  False -> renderLog
-{-# INLINE df1 #-}
-
 -- This is rather ugly, but whatever.
 renderLogColor :: Log -> BB.Builder
-{-# INLINE renderLogColor #-}
 renderLogColor = \(Log syst lvl path msg) ->
-  let t = renderIso8601 syst <> space
-      pDef = \fg -> renderPathColor fg fgBlue fgCyan path <> space
-      pRed = renderPathColor fgBlack fgWhite fgWhite path <> space
-      m = space <> escapeMessage msg <> reset
-  in case lvl of
-      Debug -> reset <> t <> pDef fgDefault <> fgDefault <> debug <> m
-      Info -> reset <> t <> pDef fgDefault <> fgDefault <> info <> m
-      Notice -> bgDefault <> fgGreen <> t <> pDef fgDefault <> fgGreen <> notice <> m
-      Warning -> bgDefault <> fgYellow <> t <> pDef fgDefault <> fgYellow <> warning <> m
-      Error -> bgDefault <> fgRed <> t <> pDef fgDefault <> fgRed <> error <> m
-      Critical -> bgRed <> fgBlack <> t <> pRed <> fgWhite <> critical <> fgBlack <> m
-      Alert -> bgRed <> fgBlack <> t <> pRed <> fgWhite <> alert <> fgBlack <> m
-      Emergency -> bgRed <> fgBlack <> t <> pRed <> fgWhite <> emergency <> fgBlack <> m
+ let t = renderIso8601 syst <> space
+     pDef = \fg -> renderPathColor fg fgBlue fgCyan path <> space
+     pRed = renderPathColor fgBlack fgWhite fgWhite path <> space
+     m = space <> renderMessage msg <> reset
+ in case lvl of
+     Debug -> reset <> t <> pDef fgDefault <> fgDefault <> debug <> m
+     Info -> reset <> t <> pDef fgDefault <> fgDefault <> info <> m
+     Notice ->
+       bgDefault <> fgGreen <> t <> pDef fgDefault <> fgGreen <> notice <> m
+     Warning ->
+       bgDefault <> fgYellow <> t <> pDef fgDefault <> fgYellow <> warning <> m
+     Error ->
+       bgDefault <> fgRed <> t <> pDef fgDefault <> fgRed <> error <> m
+     Critical ->
+       bgRed <> fgBlack <> t <> pRed <> fgWhite <> critical <> fgBlack <> m
+     Alert ->
+       bgRed <> fgBlack <> t <> pRed <> fgWhite <> alert <> fgBlack <> m
+     Emergency ->
+       bgRed <> fgBlack <> t <> pRed <> fgWhite <> emergency <> fgBlack <> m
 
 -- | Like 'renderLogColor', but without color.
 renderLog :: Log -> BB.Builder
-{-# INLINE renderLog #-}
 renderLog = \(Log syst lvl path msg) ->
   renderIso8601 syst <> space <> renderPath path <> space <>
-  level lvl <> space <> escapeMessage msg
+  level lvl <> space <> renderMessage msg
 
 -- | @'renderPathColor' a b c p@ renders @p@ using @a@ as the default color (for
 -- things like whitespace or attribute values), @b@ as the color for path names,
@@ -64,56 +63,53 @@ renderPathColor :: BB.Builder -> BB.Builder -> BB.Builder -> Path -> BB.Builder
 {-# INLINE renderPathColor #-}
 renderPathColor defc pathc keyc = fix $ \f -> \case
   Attr k v p ->
-    f p <> defc <> space <> keyc <> escapeMeta k <>
-    defc <> equals <> escapeMeta v
-  Push x p -> f p <> defc <> space <> pathc <> slash <> escapeMeta x
-  Root x -> pathc <> slash <> escapeMeta x
+    f p <> defc <> space <> keyc <> renderKey k <>
+    defc <> equals <> renderValue v
+  Push s p -> f p <> defc <> space <> pathc <> slash <> renderSegment s
+  Root s -> pathc <> slash <> renderSegment s
 
 -- | Like 'renderPathColor', but without color.
 renderPath :: Path -> BB.Builder
 {-# INLINE renderPath #-}
 renderPath = fix $ \f -> \case
-  Attr k v p -> f p <> space <> escapeMeta k <> equals <> escapeMeta v
-  Push x p -> f p <> space <> slash <> escapeMeta x
-  Root x -> slash <> escapeMeta x
+  Attr k v p -> f p <> space <> renderKey k <> equals <> renderValue v
+  Push s p -> f p <> space <> slash <> renderSegment s
+  Root s -> slash <> renderSegment s
+
+renderMessage :: Message -> BB.Builder
+{-# INLINE renderMessage #-}
+renderMessage (Message tl) = escapeMessage tl
 
 escapeMessage :: TL.Text -> BB.Builder
 {-# INLINE escapeMessage #-}
-escapeMessage = TL.encodeUtf8BuilderEscaped $
-   BBP.condB (== 10) (f2b (percent2word8Fixed (48, 97))) $  -- '\n' ->  "%0a"
-   BBP.condB (== 13) (f2b (percent2word8Fixed (48,100))) $  -- '\r' ->  "%0d"
-   BBP.condB (== 37) (f2b (percent2word8Fixed (50, 53))) $  -- '%'  ->  "%25"
-   f2b BBP.word8
+escapeMessage = TL.encodeUtf8BuilderEscaped
+  $ BBP.condB (<= 31) word8HexPercent  -- control characters
+  $ BBP.condB (== 37) word8HexPercent  -- '%'
+  $ BBP.liftFixedToBounded BBP.word8
 
--- | Escape metadata such as path names, attribute keys or attribute values.
-escapeMeta :: TL.Text -> BB.Builder
-{-# INLINE escapeMeta #-}
-escapeMeta = TL.encodeUtf8BuilderEscaped $
-   BBP.condB (== 10) (f2b (percent2word8Fixed (48, 97))) $  -- '\n' ->  "%0a"
-   BBP.condB (== 13) (f2b (percent2word8Fixed (48,100))) $  -- '\r' ->  "%0d"
-   BBP.condB (== 32) (f2b (percent2word8Fixed (50, 48))) $  -- ' '  ->  "%20"
-   BBP.condB (== 33) (f2b (percent2word8Fixed (50, 49))) $  -- '!'  ->  "%21"
-   BBP.condB (== 34) (f2b (percent2word8Fixed (50, 50))) $  -- '"'  ->  "%22"
-   BBP.condB (== 35) (f2b (percent2word8Fixed (50, 51))) $  -- '#'  ->  "%23"
-   BBP.condB (== 36) (f2b (percent2word8Fixed (50, 52))) $  -- '$'  ->  "%24"
-   BBP.condB (== 37) (f2b (percent2word8Fixed (50, 53))) $  -- '%'  ->  "%25"
-   BBP.condB (== 38) (f2b (percent2word8Fixed (50, 54))) $  -- '&'  ->  "%26"
-   BBP.condB (== 39) (f2b (percent2word8Fixed (50, 55))) $  -- '\'' ->  "%27"
-   BBP.condB (== 40) (f2b (percent2word8Fixed (50, 56))) $  -- '('  ->  "%28"
-   BBP.condB (== 41) (f2b (percent2word8Fixed (50, 57))) $  -- ')'  ->  "%29"
-   BBP.condB (== 42) (f2b (percent2word8Fixed (50, 97))) $  -- '*'  ->  "%2a"
-   BBP.condB (== 43) (f2b (percent2word8Fixed (50, 98))) $  -- '+'  ->  "%2b"
-   BBP.condB (== 44) (f2b (percent2word8Fixed (50, 99))) $  -- ','  ->  "%2c"
-   BBP.condB (== 47) (f2b (percent2word8Fixed (50,102))) $  -- '/'  ->  "%2f"
-   BBP.condB (== 58) (f2b (percent2word8Fixed (51, 97))) $  -- ':'  ->  "%3a"
-   BBP.condB (== 59) (f2b (percent2word8Fixed (51, 98))) $  -- ';'  ->  "%3b"
-   BBP.condB (== 61) (f2b (percent2word8Fixed (51,100))) $  -- '='  ->  "%3d"
-   BBP.condB (== 63) (f2b (percent2word8Fixed (51,102))) $  -- '?'  ->  "%3f"
-   BBP.condB (== 64) (f2b (percent2word8Fixed (52, 48))) $  -- '@'  ->  "%40"
-   BBP.condB (== 91) (f2b (percent2word8Fixed (53, 98))) $  -- '['  ->  "%5b"
-   BBP.condB (== 92) (f2b (percent2word8Fixed (53, 99))) $  -- '\\' ->  "%5c"
-   BBP.condB (== 93) (f2b (percent2word8Fixed (53,100))) $  -- ']'  ->  "%5d"
-   f2b BBP.word8
+renderSegment :: Segment -> BB.Builder
+{-# INLINE renderSegment #-}
+renderSegment (Segment x) = escapeMetaL (TL.fromStrict x)
+
+renderKey :: Key -> BB.Builder
+{-# INLINE renderKey #-}
+renderKey (Key x) = escapeMetaL (TL.fromStrict x)
+
+renderValue :: Value -> BB.Builder
+{-# INLINE renderValue #-}
+renderValue (Value x) = escapeMetaL x
+
+-- | Escape metadata such as path segments, attribute keys or attribute values.
+escapeMetaL :: TL.Text -> BB.Builder
+{-# INLINE escapeMetaL #-}
+escapeMetaL = TL.encodeUtf8BuilderEscaped
+   $ BBP.condB
+        (\w -> (w <= 47)               -- Control and separator-like
+            || (w >= 58 && w <= 64)    -- Delimiter-like
+            || (w >= 91 && w <= 96)    -- Delimiter-like
+            || (w >= 123 && w <= 127)) -- Delimiter-like and DEL
+        word8HexPercent
+   $ BBP.liftFixedToBounded BBP.word8
 
 --------------------------------------------------------------------------------
 -- Some hardcoded stuff we use time and time again
@@ -228,16 +224,64 @@ bgRed :: BB.Builder
 bgRed = BB.string7 "\x1b[41m"
 {-# INLINE bgRed #-}
 
--- | Render @'%'@ followed by the two given bytes
-percent2word8Fixed :: (Word8, Word8) -> BBP.FixedPrim Word8
-percent2word8Fixed x =
-  const (37, x) BBP.>$< BBP.word8 BBP.>*< BBP.word8 BBP.>*< BBP.word8
-{-# INLINE percent2word8Fixed #-}
+-- | Render @'%'@ followed by the given 'Word8' rendered as two hexadecimal
+-- nibbles.
+word8HexPercent :: BBP.BoundedPrim Word8
+word8HexPercent = BBP.liftFixedToBounded
+  ((\x -> (37, x)) BBP.>$< BBP.word8 BBP.>*< BBP.word8HexFixed)
+{-# INLINE word8HexPercent #-}
 
--- | @'f2b' == 'BBP.liftFixedToBounded'@
-f2b :: BBP.FixedPrim a -> BBP.BoundedPrim a
-f2b = BBP.liftFixedToBounded
-{-# INLINE f2b #-}
+--------------------------------------------------------------------------------
 
+-- | Renders /YYYY-MM-DDThh:mm:ss.sssssssssZ/ (nanosecond precision).
+--
+-- The rendered string is a 30 characters long, and it's ASCII-encoded.
+renderIso8601 :: Time.SystemTime -> BB.Builder
+{-# INLINE renderIso8601 #-}
+renderIso8601 = \syst ->
+  let Time.UTCTime tday tdaytime = Time.systemToUTCTime syst
+      (year, month, day) = Time.toGregorian tday
+      Time.TimeOfDay hour min' sec = Time.timeToTimeOfDay tdaytime
+  in -- Notice that 'TB.decimal' RULES dispatch to faster code for smaller
+     -- types (e.g., 'Word8' is faster to render than 'Int'), so we make
+     -- seemingly redundant 'fromIntegral' conversions here to that effect.
+     BB.int16Dec (fromIntegral year) <> "-" <>
+     word8Dec_pad10 (fromIntegral month) <> "-" <>
+     word8Dec_pad10 (fromIntegral day) <> "T" <>
+     word8Dec_pad10 (fromIntegral hour) <> ":" <>
+     word8Dec_pad10 (fromIntegral min') <> ":" <>
+     word8Dec_pad10 (truncate sec) <> "." <>
+     word32Dec_pad100000000 (Time.systemNanoseconds syst) <> "Z"
 
+word8Dec_pad10 :: Word8 -> BB.Builder
+{-# INLINE word8Dec_pad10 #-}
+word8Dec_pad10 x =
+  let !y = BB.word8Dec x
+  in if x < 10 then (_zero1 <> y) else y
+
+word32Dec_pad100000000 :: Word32 -> BB.Builder
+{-# INLINE word32Dec_pad100000000 #-}
+word32Dec_pad100000000 x =
+  let !y = BB.word32Dec x
+  in if | x < 10 -> _zero8 <> y
+        | x < 100 -> _zero7 <> y
+        | x < 1000 -> _zero6 <> y
+        | x < 10000 -> _zero5 <> y
+        | x < 100000 -> _zero4 <> y
+        | x < 1000000 -> _zero3 <> y
+        | x < 10000000 -> _zero2 <> y
+        | x < 100000000 -> _zero1 <> y
+        | otherwise -> y
+
+_zero1, _zero2, _zero3, _zero4, _zero5, _zero6, _zero7, _zero8 :: BB.Builder
+_zero1 = BB.string7 "0"
+_zero2 = BB.string7 "00"
+_zero3 = BB.string7 "000"
+_zero4 = BB.string7 "0000"
+_zero5 = BB.string7 "00000"
+_zero6 = BB.string7 "000000"
+_zero7 = BB.string7 "0000000"
+_zero8 = BB.string7 "00000000"
+
+--------------------------------------------------------------------------------
 

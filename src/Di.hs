@@ -13,28 +13,23 @@
 
 {-# OPTIONS_GHC -Wno-deprecations #-}
 
--- |
---
--- Import this module __qualified__ as follows:
+-- | Import this module __qualified__ as follows:
 --
 -- @
--- import qualified Di
+-- import qualified "Di"
 -- @
 --
 -- The /only/ name that you are encouraged to import unqualified is 'MonadDi':
 --
 -- @
--- import Di (MonadDi)
+-- import "Di" ('MonadDi')
 -- @
-
-
 module Di
  ( Di
  , new
  , new'
 
    -- * Sinks
- , df1
  , stderrLines
  , handleLines
 
@@ -44,11 +39,10 @@ module Di
  , runDiT'
 
    -- * 'MonadDi'
- , MonadDi(local, ask, liftSTM)
+ , MonadDi(local, ask, natSTM)
 
    -- ** Messages
  , log
- , Level(Debug, Info, Notice, Warning, Error, Critical, Alert, Emergency)
 
  , emergency
  , alert
@@ -65,20 +59,19 @@ module Di
  , flush
 
    -- * Extras
-   --
-   -- These types are not particularly important if all you want to do is log
-   -- messages. However, if you are trying to extend this library somehow, you
-   -- will need these.
  , Log(Log, logTime, logLevel, logPath, logMessage)
+ , Message(Message)
+ , Level(Debug, Info, Notice, Warning, Error, Critical, Alert, Emergency)
  , Path(Attr, Push, Root)
  , pathRoot
+ , Segment(Segment)
+ , Key(Key)
+ , Value(Value)
  , Sink(Sink)
  , withSink
  , sinkFallback
-
  , test
  ) where
-
 
 import Prelude hiding (error, max, log)
 
@@ -92,6 +85,7 @@ import Control.Monad.Cont (MonadCont, ContT(ContT))
 import Control.Monad.Error (MonadError, ErrorT(ErrorT), Error)
 import Control.Monad.Except (ExceptT(ExceptT))
 import Control.Monad.Fail (MonadFail)
+import Control.Monad.Morph (MFunctor(hoist))
 import Control.Monad.Identity (IdentityT(IdentityT))
 import Control.Monad.List (ListT(ListT))
 import Control.Monad.Fix (MonadFix)
@@ -111,23 +105,25 @@ import qualified Control.Monad.Writer.Lazy as WL
 import qualified Control.Monad.Writer.Strict as WS
 import Control.Monad.Zip (MonadZip)
 import Data.Function (fix)
+import Data.String (fromString)
 import qualified Data.Time.Clock.System as Time
-import qualified Data.Text as T
-import qualified Data.Text.Lazy as TL
 
-import Di.Df1 (df1)
+import qualified Di.Df1
 import Di.Misc (mute, muteSync, catchSync, getSystemTimeSTM)
 import Di.Sink
   (Sink(Sink), withSink, stderrLines, handleLines, sinkFallback, withSink)
 import Di.Types
-  (Log(Log, logTime, logLevel, logPath, logMessage),
+  (Log(Log, logTime, logLevel, logPath, logMessage), Message(Message),
    Level(Debug, Info, Notice, Warning, Error, Critical, Alert, Emergency),
    Path(Attr, Push, Root), pathRoot,
+   Segment(Segment), Key(Key), Value(Value),
    Di(Di, diMax, diPath, diLogs))
 
 {-
 TODO Specify lazy semantics for Log fields. E.g., logging a message containing
 `undefined` should be caught gracefuly inside di.
+
+TODO Export the df1 rendererer from the Di module.
 
 TODO Tests for lazy semantics.
 
@@ -196,7 +192,7 @@ TODO Rename MonadDi to MonadLog, DiT to LogT, Log to Request?
 -- line.
 --
 -- @
--- 'new' name  ==  'new'' name ('stderrLines' 'df1')
+-- 'new' name  ==  'new'' name ('stderrLines' 'Di.Df1.render')
 -- @
 --
 -- You are supposed to call 'new' _only once per application_, and this one 'Di'
@@ -217,11 +213,11 @@ TODO Rename MonadDi to MonadLog, DiT to LogT, Log to Request?
 -- library needs to obtain a concrete 'Di', for example, to call 'runDiT' from
 -- a different thread, then it could get that 'Di' using @'Di.ask' :: 'MonadDi'
 -- m => m 'Di'@, or simply receive as an argument.
-new :: String -> (Di -> IO a) -> IO a
-new name act = new' name (stderrLines df1) act
+new :: Segment -> (Di -> IO a) -> IO a
+new name act = new' name (stderrLines Di.Df1.render) act
 
 new'
-  :: String -- ^ Root path name.
+  :: Segment -- ^ Root segment name.
   -> Sink
   -> (Di -> IO a)
   -> IO a
@@ -234,7 +230,7 @@ new' name sink act =
        Left se -> case Ex.asyncExceptionFromException se of
           Just (_ :: Ex.AsyncException) -> Ex.throwIO se
           Nothing -> k >> pure ()
-    let di = Di Debug (Root (TL.pack name)) tqLogs
+    let di = Di Debug (Root name) tqLogs
     -- Run 'act', silently flushing and logging any unhandled synchronous
     -- exceptions afterwards.
     flip Ex.finally (mute (atomically (flushDi di))) $
@@ -244,7 +240,7 @@ new' name sink act =
          mute $ atomically $ writeTQueue tqLogs $ Log
            { logTime = syst, logLevel = Alert
            , logPath = Attr "exception"
-               (TL.pack (Ex.displayException se)) (diPath di)
+               (fromString (Ex.displayException se)) (diPath di)
            , logMessage = "Unhandled exception. \
                           \Logging system will stop now." }
          Ex.throw se
@@ -289,59 +285,59 @@ flushDi di = check =<< isEmptyTQueue (diLogs di)
 --
 -- /Note regarding exceptions:/ As witnessed by the 'MonadDi' context, the only
 -- exceptions that could ever be thrown by this function are those that
--- 'liftSTM' could. Synchronous exceptions that happen due to failures in the
+-- 'natSTM' could. Synchronous exceptions that happen due to failures in the
 -- actual priting of the log message are handled in a different by attempting to
 -- log the message to 'IO.stderr' as a fallback. Asynchronous exceptions that
 -- might there, as expected, are not explicitly handled. In practical terms,
 -- this means that unless you know what you are doing, /you should
 -- just call 'log' without worrying about it ever throwing exceptions/.
-log :: MonadDi m => Level -> TL.Text -> m ()
+log :: MonadDi m => Level -> Message -> m ()
 log l = \m -> ask >>= \di ->
    when (l >= diMax di) $ do
-      !syst <- liftSTM getSystemTimeSTM
+      !syst <- natSTM getSystemTimeSTM
       let !x = Log syst l (diPath di) m
-      liftSTM $ writeTQueue (diLogs di) x
+      natSTM $ writeTQueue (diLogs di) x
 {-# INLINABLE log #-}
 
 -- | @
 -- 'emergency' == 'log' 'Emergency'
 -- @
-emergency :: MonadDi m => TL.Text -> m ()
+emergency :: MonadDi m => Message -> m ()
 emergency = log Emergency
 {-# INLINE emergency #-}
 
 -- | @
 -- 'alert' == 'log' 'Alert'
 -- @
-alert :: MonadDi m => TL.Text -> m ()
+alert :: MonadDi m => Message -> m ()
 alert = log Alert
 {-# INLINE alert #-}
 
 -- | @
 -- 'critical' == 'log' 'Critical'
 -- @
-critical :: MonadDi m => TL.Text -> m ()
+critical :: MonadDi m => Message -> m ()
 critical = log Critical
 {-# INLINE critical #-}
 
 -- | @
 -- 'error' == 'log' 'Error'
 -- @
-error :: MonadDi m => TL.Text -> m ()
+error :: MonadDi m => Message -> m ()
 error = log Error
 {-# INLINE error #-}
 
 -- | @
 -- 'warning' == 'log' 'Warning'
 -- @
-warning :: MonadDi m => TL.Text -> m ()
+warning :: MonadDi m => Message -> m ()
 warning = log Warning
 {-# INLINE warning #-}
 
 -- | @
 -- 'notice' == 'log' 'Notice'
 -- @
-notice :: MonadDi m => TL.Text -> m ()
+notice :: MonadDi m => Message -> m ()
 notice = log Notice
 {-# INLINE notice #-}
 
@@ -349,14 +345,14 @@ notice = log Notice
 -- | @
 -- 'info' == 'log' 'Info'
 -- @
-info :: MonadDi m => TL.Text -> m ()
+info :: MonadDi m => Message -> m ()
 info = log Info
 {-# INLINE info #-}
 
 -- | @
 -- 'debug' == 'log' 'Debug'
 -- @
-debug :: MonadDi m => TL.Text -> m ()
+debug :: MonadDi m => Message -> m ()
 debug = log Debug
 {-# INLINE debug #-}
 
@@ -369,7 +365,7 @@ debug = log Debug
 -- processed. A call to 'flush' will block until all pending log messages have
 -- been processed.
 flush :: MonadDi m => m ()
-flush = ask >>= \di -> liftSTM (flushDi di)
+flush = ask >>= \di -> natSTM (flushDi di)
 {-# INLINABLE flush #-}
 
 -- | Returns a new 'Di' on which only messages with at least the specified
@@ -389,7 +385,7 @@ flush = ask >>= \di -> liftSTM (flushDi di)
 --    'max' a . 'max' b . 'max' a  ==  'id'
 -- @
 max :: MonadDi m => Level -> m a -> m a
-max !l m = local (\di -> di { diMax = l }) m
+max !l = local (\di -> di { diMax = l })
 {-# INLINE max #-}
 
 -- | Push a new @path@ to the 'Di'.
@@ -405,15 +401,15 @@ max !l m = local (\di -> di { diMax = l }) m
 -- @
 -- 'push' (a <> b)   ==   'push' b . 'push' a
 -- @
-push :: MonadDi m => T.Text -> m a -> m a
+push :: MonadDi m => Segment -> m a -> m a
 {-# INLINE push #-}
-push x m = local (\di ->
-  di { diPath = Push (TL.fromStrict x) (diPath di) }) m
+push s = local (\di -> di { diPath = Push s (diPath di) })
 
-attr :: MonadDi m => T.Text -> T.Text -> m a -> m a
+attr :: MonadDi m => Key -> Value -> m a -> m a
 {-# INLINE attr #-}
-attr k v m = local (\di ->
-  di { diPath = Attr (TL.fromStrict k) (TL.fromStrict v) (diPath di) }) m
+attr k v m = local (\di -> di { diPath = Attr k v (diPath di) }) m
+
+
 
 --------------------------------------------------------------------------------
 
@@ -424,8 +420,7 @@ attr k v m = local (\di ->
 -- as 'push' or 'debug', rely on 'MonadDi'.
 --
 -- Semantically, @'MonadDi' m@ is a “reader monad” that carries as its
--- environment a 'Di' and a natural transformation used to lift 'STM'
--- actions to @m@.
+-- environment a 'Di' and natural transformation from 'STM' to @m@.
 class Monad m => MonadDi m where
   -- | Get the 'Di' inside @m@, unmodified.
   --
@@ -465,10 +460,13 @@ class Monad m => MonadDi m where
   local :: (Di -> Di) -> m a -> m a
 
   -- | Natural transformation from 'STM' to @m@.
-  liftSTM :: STM a -> m a
-  default liftSTM :: (MonadTrans t, MonadDi n, m ~ t n) => STM a -> m a
-  liftSTM = \x -> lift (liftSTM x)
-  {-# INLINE liftSTM #-}
+  --
+  -- Notice that /it is not necessary/ for this natural transformation to be a
+  -- monad morphism as well. That is, 'atomically' is acceptable.
+  natSTM :: STM a -> m a
+  default natSTM :: (MonadTrans t, MonadDi n, m ~ t n) => STM a -> m a
+  natSTM = \x -> lift (natSTM x)
+  {-# INLINE natSTM #-}
 
 --------------------------------------------------------------------------------
 
@@ -485,13 +483,24 @@ instance MonadTrans DiT where
   lift = \x -> DiT (lift x)
   {-# INLINE lift #-}
 
--- | Run a 'DiT'.
+-- TODO: we can't have a MFunctor DiT instance because of the natural
+-- transformation inside 'DiT'. We need to move that natural transformation
+-- out.
+
+-- | Like 'runDiT'', but specialized to run with an underlying 'MonadIO'.
+--
+-- @
+-- 'runDiT'  ==  'runDiT'' ('liftIO' . 'atomically')
+-- @
+--
+-- Also, notice that 'runDiT' is a /monad morphism/ from @'DiT' m@ to @m@.
 runDiT :: MonadIO m => Di -> DiT m a -> m a
 runDiT = runDiT' (\x -> liftIO (atomically x))
 {-# INLINE runDiT #-}
 
 -- | Like 'runDiT'', however it doesn't require a 'MonadIO' constraint. Instead,
--- it requires the natural transformation that will be used as 'liftSTM'.
+-- it takes the natural transformation that will be used by 'natSTM' as an
+-- argument.
 --
 -- First, this allows any monad that wraps 'IO' without necessarily having a
 -- 'MonadIO' instance to work with 'MonadDi'. For example:
@@ -512,8 +521,14 @@ runDiT = runDiT' (\x -> liftIO (atomically x))
 -- @
 --
 -- The semantics of logging from within 'STM' are those of any other 'STM'
--- transaction: That is, log messages are only ever commited once to the outside
--- world if and when the 'STM' transaction succeeds, and not before.
+-- transaction: That is, a log message is commited only once to the outside
+-- world if and when the 'STM' transaction succeeds. That is, the following
+-- example will only ever log @\"YES\"@:
+--
+-- @
+-- 'atomically' $ 'runDiT'' 'id' $ do
+--    ('info' \"NO\" >> 'lift' 'Control.Concurrent.STM.retry') <|> 'info' \"YES\")
+-- @
 --
 -- Of course, 'runDiT'' works as well if you decide to wrap 'STM' with your own
 -- monad type:
@@ -525,76 +540,86 @@ runDiT = runDiT' (\x -> liftIO (atomically x))
 -- 'runDiT'' Bar
 --      :: 'Di' -> 'DiT' Bar a -> Bar a
 -- @
+--
+-- Additionally, notice that 'runDiT'' itself is a /monad morphism/ from @'DiT'
+-- m@ to @m@ which doesn't perform any side effects of its own.  Particularly,
+-- the given 'Di' remains unaffected. So you can use it as many times you want.
+--
+-- @
+-- forall f di x.
+--    'runDiT'' f di ('lift' x)  ==  x
+-- @
 runDiT' :: (forall x. STM x -> m x) -> Di -> DiT m a -> m a
 runDiT' h = \di -> \(DiT (ReaderT f)) -> f (di, H h)
 {-# INLINE runDiT' #-}
 
 instance MonadReader r m => MonadReader r (DiT m) where
   ask = DiT (ReaderT (\_ -> Reader.ask))
-  {-# INLINABLE ask #-}
-  local f (DiT (ReaderT gma)) = DiT (ReaderT (\di -> Reader.local f (gma di)))
-  {-# INLINABLE local #-}
+  {-# INLINE ask #-}
+  local f = \(DiT (ReaderT gma)) ->
+     DiT (ReaderT (\di -> Reader.local f (gma di)))
+  {-# INLINE local #-}
 
 instance Monad m => MonadDi (DiT m) where
   ask = DiT (ReaderT (\(di,_) -> pure di))
   {-# INLINE ask #-}
-  local f (DiT (ReaderT gma)) = DiT (ReaderT (\(di, h) -> gma (f di, h)))
+  local f = \(DiT (ReaderT gma)) -> DiT (ReaderT (\(di, h) -> gma (f di, h)))
   {-# INLINE local #-}
-  liftSTM = \x -> DiT (ReaderT (\(_, H h) -> h x))
-  {-# INLINE liftSTM #-}
+  natSTM = \x -> DiT (ReaderT (\(_, H h) -> h x))
+  {-# INLINE natSTM #-}
 
 --------------------------------------------------------------------------------
 
 instance MonadDi m => MonadDi (ReaderT r m) where
-  local f (ReaderT gma) = ReaderT (\r -> local f (gma r))
+  local f = \(ReaderT gma) -> ReaderT (\r -> local f (gma r))
   {-# INLINE local #-}
 
 instance MonadDi m => MonadDi (SS.StateT s m) where
-  local f (SS.StateT gma) = SS.StateT (\s -> local f (gma s))
+  local f = \(SS.StateT gma) -> SS.StateT (\s -> local f (gma s))
   {-# INLINE local #-}
 
 instance MonadDi m => MonadDi (SL.StateT s m) where
-  local f (SL.StateT gma) = SL.StateT (\s -> local f (gma s))
+  local f = \(SL.StateT gma) -> SL.StateT (\s -> local f (gma s))
   {-# INLINE local #-}
 
 instance (Monoid w, MonadDi m) => MonadDi (WS.WriterT w m) where
-  local f (WS.WriterT ma) = WS.WriterT (local f ma)
+  local f = \(WS.WriterT ma) -> WS.WriterT (local f ma)
   {-# INLINE local #-}
 
 instance (Monoid w, MonadDi m) => MonadDi (WL.WriterT w m) where
-  local f (WL.WriterT ma) = WL.WriterT (local f ma)
+  local f = \(WL.WriterT ma) -> WL.WriterT (local f ma)
   {-# INLINE local #-}
 
 instance MonadDi m => MonadDi (MaybeT m) where
-  local f (MaybeT ma) = MaybeT (local f ma)
+  local f = \(MaybeT ma) -> MaybeT (local f ma)
   {-# INLINE local #-}
 
 instance (Error e, MonadDi m) => MonadDi (ErrorT e m) where
-  local f (ErrorT ma) = ErrorT (local f ma)
+  local f = \(ErrorT ma) -> ErrorT (local f ma)
   {-# INLINE local #-}
 
 instance MonadDi m => MonadDi (ExceptT e m) where
-  local f (ExceptT ma) = ExceptT (local f ma)
+  local f = \(ExceptT ma) -> ExceptT (local f ma)
   {-# INLINE local #-}
 
 instance MonadDi m => MonadDi (IdentityT m) where
-  local f (IdentityT ma) = IdentityT (local f ma)
+  local f = \(IdentityT ma) -> IdentityT (local f ma)
   {-# INLINE local #-}
 
 instance MonadDi m => MonadDi (ListT m) where
-  local f (ListT ma) = ListT (local f ma)
+  local f = \(ListT ma) -> ListT (local f ma)
   {-# INLINE local #-}
 
 instance MonadDi m => MonadDi (ContT r m) where
-  local f (ContT gma) = ContT (\r -> local f (gma r))
+  local f = \(ContT gma) -> ContT (\r -> local f (gma r))
   {-# INLINE local #-}
 
 instance (Monoid w, MonadDi m) => MonadDi (RWSS.RWST r w s m) where
-  local f (RWSS.RWST gma) = RWSS.RWST (\r s -> local f (gma r s))
+  local f = \(RWSS.RWST gma) -> RWSS.RWST (\r s -> local f (gma r s))
   {-# INLINE local #-}
 
 instance (Monoid w, MonadDi m) => MonadDi (RWSL.RWST r w s m) where
-  local f (RWSL.RWST gma) = RWSL.RWST (\r s -> local f (gma r s))
+  local f = \(RWSL.RWST gma) -> RWSL.RWST (\r s -> local f (gma r s))
   {-# INLINE local #-}
 
 --------------------------------------------------------------------------------

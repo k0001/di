@@ -1,34 +1,38 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Di.Df1.Parser
- ( pLog
+ ( parseLog
  ) where
 
-import Control.Applicative ((<|>))
-import Control.Monad.Fix (mfix)
+import Control.Applicative ((<|>), many, empty)
+import Control.Monad (guard)
+import Data.Bits (shiftL)
+import Data.Char (ord)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import Data.Function (fix)
 import Data.Functor (($>))
 import qualified Data.Attoparsec.ByteString as AB
 import qualified Data.Attoparsec.ByteString.Char8 as A8
+import Data.Monoid ((<>))
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as TL
 import qualified Data.Time as Time
 import qualified Data.Time.Clock.System as Time
 import Data.Word (Word8, Word16, Word32)
 
-import Di.Misc (iterateM)
 import Di.Types as Di
- (Log(Log),
+ (Log(Log), Message(Message),
   Level(Debug, Info, Notice, Warning, Error, Critical, Alert, Emergency),
-  Path(Attr, Push, Root))
+  Path(Attr, Push, Root), Segment(Segment), Key(Key), Value(Value))
 
 --------------------------------------------------------------------------------
 
-pLog :: AB.Parser Di.Log
-{-# INLINE pLog #-}
-pLog = (AB.<?> "pLog") $ do
+parseLog :: AB.Parser Di.Log
+parseLog = (AB.<?> "parseLog") $ do
   t <- AB.skipWhile (== 32) *> pIso8601
   p <- AB.skipWhile (== 32) *> pPath
   l <- AB.skipWhile (== 32) *> pLevel
@@ -106,39 +110,80 @@ pPath = (AB.<?> "pLevel") $ do
     pRoot :: AB.Parser Di.Path
     pRoot = (AB.<?> "pRoot") $ do
       AB.skip (== 47) AB.<?> "/"
-      key <- pUtf8S =<< (AB.takeWhile1 (/= 32) AB.<?> "key")
-      pure (Di.Root key)
+      seg <- pUtf8LtoL =<< pDecodePercents =<< AB.takeWhile (/= 32)
+      pure (Di.Root (Di.Segment (TL.toStrict seg)))
     pPush :: Di.Path -> AB.Parser Di.Path
     pPush path = (AB.<?> "pPush") $ do
       AB.skipWhile (== 32)  -- space
       AB.skip (== 47) AB.<?> "/"
-      key <- pUtf8S =<< (AB.takeWhile1 (/= 32) AB.<?> "key")
-      pure (Di.Push key path)
+      seg <- pUtf8LtoL =<< pDecodePercents =<< AB.takeWhile (/= 32)
+      pure (Di.Push (Di.Segment (TL.toStrict seg)) path)
     pAttr :: Di.Path -> AB.Parser Di.Path
     pAttr path = do
       AB.skipWhile (== 32) -- space
-      key <- pUtf8S =<< (AB.takeWhile1 (/= 61) AB.<?> "key")
+      key <- pUtf8LtoL =<< pDecodePercents =<< AB.takeWhile (/= 61)
       AB.skip (== 61) AB.<?> "="
-      val <- pUtf8S =<< (AB.takeWhile1 (/= 32) AB.<?> "value")
-      pure (Di.Attr key val path)
+      val <- pUtf8LtoL =<< pDecodePercents =<< AB.takeWhile (/= 32)
+      pure (Di.Attr (Key (TL.toStrict key)) (Value val) path)
     {-# INLINE pRoot #-}
     {-# INLINE pPush #-}
     {-# INLINE pAttr #-}
 
-pMessage :: AB.Parser TL.Text
+pMessage :: AB.Parser Di.Message
+{-# INLINE pMessage #-}
 pMessage = (AB.<?> "pMessage") $ do
   -- TODO drop trailing whitespace. Probably do it with Pipes.
-  pUtf8L =<< AB.takeLazyByteString
+  tl <- pUtf8LtoL =<< pDecodePercents =<< AB.takeWhile (/= 10)
+  pure (Di.Message tl)
 
-pUtf8L :: BL.ByteString -> AB.Parser TL.Text
-{-# INLINE pUtf8L #-}
-pUtf8L = \bl -> case TL.decodeUtf8' bl of
+pUtf8LtoL :: BL.ByteString -> AB.Parser TL.Text
+{-# INLINE pUtf8LtoL #-}
+pUtf8LtoL = \bl -> case TL.decodeUtf8' bl of
    Right x -> pure x
-   Left e -> fail (show e) AB.<?> "pUtf8L"
+   Left e -> fail (show e) AB.<?> "pUtf8LtoL"
 
-pUtf8S :: B.ByteString -> AB.Parser TL.Text
-{-# INLINE pUtf8S #-}
-pUtf8S = \b -> case TL.decodeUtf8' (BL.fromStrict b) of
+pUtf8StoS :: B.ByteString -> AB.Parser T.Text
+{-# INLINE pUtf8StoS #-}
+pUtf8StoS = \b -> case T.decodeUtf8' b of
    Right x -> pure x
-   Left e -> fail (show e) AB.<?> "pUtf8S"
+   Left e -> fail (show e) AB.<?> "pUtf8StoS"
+
+-- | Parse @\"%FF\"@. Always consumes 3 bytes from the input, if successful.
+pNumPercent :: AB.Parser Word8
+{-# INLINE pNumPercent #-}
+pNumPercent = (AB.<?> "pNum2Nibbles") $ do
+   AB.skip (== 37) -- percent
+   wh <- pHexDigit
+   wl <- pHexDigit
+   pure (shiftL wh 4 + wl)
+
+pHexDigit :: AB.Parser Word8
+{-# INLINE pHexDigit #-}
+pHexDigit = AB.satisfyWith
+  (\case w | w >= 48 && w <=  57 -> w - 48
+           | w >= 65 && w <=  70 -> w - 55
+           | w >= 97 && w <= 102 -> w - 87
+           | otherwise -> 99)
+  (\w -> w /= 99)
+
+-- | Decodes all 'pNumPercent' occurences from the given input.
+--
+-- TODO: Make faster.
+pDecodePercents :: B.ByteString -> AB.Parser BL.ByteString
+{-# INLINE pDecodePercents #-}
+pDecodePercents = \b -> either fail pure (AB.parseOnly p b) where
+  p :: AB.Parser BL.ByteString
+  p = AB.atEnd >>= \case
+        True -> pure mempty
+        False -> fix $ \k -> do
+           b <- AB.peekWord8 >>= \case
+              Nothing -> empty
+              Just 37 -> fmap B.singleton pNumPercent
+              Just _  -> AB.takeWhile1 (\w -> w /= 37)
+           bls <- many k <* AB.endOfInput
+           pure (mconcat (BL.fromStrict b : bls))
+
+
+
+
 

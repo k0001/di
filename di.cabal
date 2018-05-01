@@ -17,7 +17,7 @@ bug-reports: https://github.com/k0001/di/issues
 library
   hs-source-dirs: src
   default-language: Haskell2010
-  exposed-modules: Di Di.Df1
+  exposed-modules: Di Di.Df1 Di.Gen
   other-modules:
     Di.Df1.Render
     Di.Df1.Parser
@@ -29,11 +29,13 @@ library
     base >=4.9 && <5.0,
     bytestring,
     containers,
+    mmorph,
     mtl,
     stm,
     text,
     time,
-    transformers
+    transformers,
+    QuickCheck
   ghcjs-options: -Wall -O3
   ghc-options: -Wall -O2
   if !os(windows)
@@ -63,6 +65,7 @@ executable df1
     base,
     di,
     optparse-applicative,
+    stm,
     text,
     time,
     QuickCheck
