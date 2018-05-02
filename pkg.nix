@@ -1,6 +1,8 @@
-{ mkDerivation, attoparsec, base, bytestring, containers, mmorph
-, mtl, optparse-applicative, QuickCheck, stdenv, stm, tasty
-, tasty-hunit, tasty-quickcheck, text, time, transformers, unix
+{ mkDerivation, attoparsec, base, bytestring, containers, free
+, lens-family, mmorph, mtl, optparse-applicative, pipes
+, pipes-attoparsec, pipes-bytestring, pipes-group, pipes-parse
+, QuickCheck, stdenv, stm, tasty, tasty-hunit, tasty-quickcheck
+, text, time, transformers, unix
 }:
 mkDerivation {
   pname = "di";
@@ -9,11 +11,13 @@ mkDerivation {
   isLibrary = true;
   isExecutable = true;
   libraryHaskellDepends = [
-    attoparsec base bytestring containers mmorph mtl QuickCheck stm
-    text time transformers unix
+    attoparsec base bytestring containers free lens-family mmorph mtl
+    pipes pipes-attoparsec pipes-bytestring pipes-group pipes-parse
+    QuickCheck stm text time transformers unix
   ];
   executableHaskellDepends = [
-    base optparse-applicative QuickCheck text time
+    attoparsec base optparse-applicative pipes pipes-attoparsec
+    pipes-bytestring QuickCheck stm text time transformers
   ];
   testHaskellDepends = [
     base bytestring QuickCheck stm tasty tasty-hunit tasty-quickcheck

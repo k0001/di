@@ -6,18 +6,14 @@ module Di.Df1.Parser
  ) where
 
 import Control.Applicative ((<|>), many, empty)
-import Control.Monad (guard)
+import Control.Monad (void)
 import Data.Bits (shiftL)
-import Data.Char (ord)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import Data.Function (fix)
 import Data.Functor (($>))
 import qualified Data.Attoparsec.ByteString as AB
-import qualified Data.Attoparsec.ByteString.Char8 as A8
-import Data.Monoid ((<>))
-import qualified Data.Text as T
-import qualified Data.Text.Encoding as T
+import qualified Data.Attoparsec.ByteString.Lazy as ABL
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as TL
 import qualified Data.Time as Time
@@ -37,6 +33,8 @@ parseLog = (AB.<?> "parseLog") $ do
   p <- AB.skipWhile (== 32) *> pPath
   l <- AB.skipWhile (== 32) *> pLevel
   m <- AB.skipWhile (== 32) *> pMessage
+  -- Make sure we reached the end or a newline.
+  void AB.atEnd <|> void (AB.word8 10) <|> void (AB.word8 13 >> AB.word8 10)
   pure (Log (Time.utcToSystemTime t) l p m)
 
 pIso8601 :: AB.Parser Time.UTCTime
@@ -132,8 +130,7 @@ pPath = (AB.<?> "pLevel") $ do
 pMessage :: AB.Parser Di.Message
 {-# INLINE pMessage #-}
 pMessage = (AB.<?> "pMessage") $ do
-  -- TODO drop trailing whitespace. Probably do it with Pipes.
-  tl <- pUtf8LtoL =<< pDecodePercents =<< AB.takeWhile (/= 10)
+  tl <- pUtf8LtoL =<< pDecodePercentsL =<< AB.takeLazyByteString
   pure (Di.Message tl)
 
 pUtf8LtoL :: BL.ByteString -> AB.Parser TL.Text
@@ -141,12 +138,6 @@ pUtf8LtoL :: BL.ByteString -> AB.Parser TL.Text
 pUtf8LtoL = \bl -> case TL.decodeUtf8' bl of
    Right x -> pure x
    Left e -> fail (show e) AB.<?> "pUtf8LtoL"
-
-pUtf8StoS :: B.ByteString -> AB.Parser T.Text
-{-# INLINE pUtf8StoS #-}
-pUtf8StoS = \b -> case T.decodeUtf8' b of
-   Right x -> pure x
-   Left e -> fail (show e) AB.<?> "pUtf8StoS"
 
 -- | Parse @\"%FF\"@. Always consumes 3 bytes from the input, if successful.
 pNumPercent :: AB.Parser Word8
@@ -166,24 +157,27 @@ pHexDigit = AB.satisfyWith
            | otherwise -> 99)
   (\w -> w /= 99)
 
--- | Decodes all 'pNumPercent' occurences from the given input.
---
--- TODO: Make faster.
+-- | Like 'pDecodePercentsL' but takes strict bytes.
 pDecodePercents :: B.ByteString -> AB.Parser BL.ByteString
 {-# INLINE pDecodePercents #-}
-pDecodePercents = \b -> either fail pure (AB.parseOnly p b) where
-  p :: AB.Parser BL.ByteString
-  p = AB.atEnd >>= \case
-        True -> pure mempty
-        False -> fix $ \k -> do
-           b <- AB.peekWord8 >>= \case
-              Nothing -> empty
-              Just 37 -> fmap B.singleton pNumPercent
-              Just _  -> AB.takeWhile1 (\w -> w /= 37)
-           bls <- many k <* AB.endOfInput
-           pure (mconcat (BL.fromStrict b : bls))
+pDecodePercents = pDecodePercentsL . BL.fromStrict
 
-
-
-
+-- | Decodes all 'pNumPercent' occurences from the given input.
+--
+-- TODO: Make faster and more space efficient.
+pDecodePercentsL :: BL.ByteString -> AB.Parser BL.ByteString
+{-# INLINE pDecodePercentsL #-}
+pDecodePercentsL = \bl ->
+    either fail pure (ABL.eitherResult (ABL.parse p bl))
+  where
+    p :: AB.Parser BL.ByteString
+    p = AB.atEnd >>= \case
+          True -> pure mempty
+          False -> fix $ \k -> do
+             b <- AB.peekWord8 >>= \case
+                Nothing -> empty
+                Just 37 -> fmap B.singleton pNumPercent
+                Just _  -> AB.takeWhile1 (\w -> w /= 37)
+             bls <- many k <* AB.endOfInput
+             pure (mconcat (BL.fromStrict b : bls))
 

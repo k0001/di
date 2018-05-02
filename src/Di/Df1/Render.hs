@@ -83,8 +83,8 @@ renderMessage (Message tl) = escapeMessage tl
 escapeMessage :: TL.Text -> BB.Builder
 {-# INLINE escapeMessage #-}
 escapeMessage = TL.encodeUtf8BuilderEscaped
-  $ BBP.condB (<= 31) word8HexPercent  -- control characters
   $ BBP.condB (== 37) word8HexPercent  -- '%'
+  $ BBP.condB (<= 31) word8HexPercent  -- control characters
   $ BBP.liftFixedToBounded BBP.word8
 
 renderSegment :: Segment -> BB.Builder

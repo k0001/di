@@ -29,8 +29,15 @@ library
     base >=4.9 && <5.0,
     bytestring,
     containers,
+    free,
+    lens-family,
     mmorph,
     mtl,
+    pipes,
+    pipes-attoparsec,
+    pipes-bytestring,
+    pipes-group,
+    pipes-parse,
     stm,
     text,
     time,
@@ -62,10 +69,15 @@ executable df1
   default-language: Haskell2010
   ghc-options: -Wall -threaded -O3
   build-depends:
+    attoparsec,
     base,
     di,
     optparse-applicative,
+    pipes,
+    pipes-attoparsec,
+    pipes-bytestring,
     stm,
     text,
+    transformers,
     time,
     QuickCheck

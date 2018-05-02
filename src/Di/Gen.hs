@@ -25,14 +25,14 @@ module Di.Gen
 
 import Control.Concurrent.STM (atomically, writeTQueue)
 import Data.String (fromString)
-import qualified Data.Text as T
-import qualified Data.Text.Lazy as TL
 import qualified Data.Time.Clock.System as Time
+import qualified System.IO
 import qualified Test.QuickCheck as QC
 
 import qualified Di
+import qualified Di.Df1
 import Di.Misc (iterateM)
-import qualified Di.Types as Di (diPath, diLogs, diMax)
+import qualified Di.Types as Di (diLogs)
 
 --------------------------------------------------------------------------------
 
@@ -112,5 +112,6 @@ genLogs = iterateM genLogAfter =<< genLog
 
 ioPrintLogs :: [Di.Log] -> IO ()
 ioPrintLogs logs = do
-  Di.new "unused" $ \di -> do
+  let sink = Di.handleLines System.IO.stdout Di.Df1.render
+  Di.new' "unused" sink $ \di -> do
      mapM_ (atomically . writeTQueue (Di.diLogs di)) logs

@@ -70,6 +70,10 @@ module Di
  , Sink(Sink)
  , withSink
  , sinkFallback
+ , LogLineParser(LogLineParserUtf8)
+ , runLogLineParser
+ , LogLineRenderer(LogLineRendererUtf8)
+ , LogBlobRenderer(LogBlobRenderer)
  , test
  ) where
 
@@ -81,11 +85,11 @@ import Control.Concurrent.STM
   (STM, atomically, check,
    TQueue, newTQueueIO, readTQueue, writeTQueue, peekTQueue, isEmptyTQueue)
 import qualified Control.Exception as Ex
+import Control.Monad (join)
 import Control.Monad.Cont (MonadCont, ContT(ContT))
 import Control.Monad.Error (MonadError, ErrorT(ErrorT), Error)
 import Control.Monad.Except (ExceptT(ExceptT))
 import Control.Monad.Fail (MonadFail)
-import Control.Monad.Morph (MFunctor(hoist))
 import Control.Monad.Identity (IdentityT(IdentityT))
 import Control.Monad.List (ListT(ListT))
 import Control.Monad.Fix (MonadFix)
@@ -99,17 +103,24 @@ import Control.Monad.State (MonadState)
 import qualified Control.Monad.State.Lazy as SL
 import qualified Control.Monad.State.Strict as SS
 import Control.Monad.Trans.Class (MonadTrans, lift)
+import Control.Monad.Trans.Free (iterTM)
 import Control.Monad.Trans.Maybe (MaybeT(MaybeT))
 import Control.Monad.Writer (MonadWriter)
 import qualified Control.Monad.Writer.Lazy as WL
 import qualified Control.Monad.Writer.Strict as WS
 import Control.Monad.Zip (MonadZip)
-import Data.Function (fix)
+import qualified Data.ByteString as B
 import Data.String (fromString)
+import Data.Function (fix)
 import qualified Data.Time.Clock.System as Time
+import Lens.Family2 (view)
+import qualified Pipes.ByteString as Pb
+import qualified Pipes as P
+import qualified Pipes.Internal as P
+import qualified System.Exit
 
 import qualified Di.Df1
-import Di.Misc (mute, muteSync, catchSync, getSystemTimeSTM)
+import Di.Misc (mute, muteSync, catchSync, getSystemTimeSTM, drainProducer)
 import Di.Sink
   (Sink(Sink), withSink, stderrLines, handleLines, sinkFallback, withSink)
 import Di.Types
@@ -117,7 +128,10 @@ import Di.Types
    Level(Debug, Info, Notice, Warning, Error, Critical, Alert, Emergency),
    Path(Attr, Push, Root), pathRoot,
    Segment(Segment), Key(Key), Value(Value),
-   Di(Di, diMax, diPath, diLogs))
+   Di(Di, diMax, diPath, diLogs),
+   LogLineParser(LogLineParserUtf8),
+   LogLineRenderer(LogLineRendererUtf8),
+   LogBlobRenderer(LogBlobRenderer))
 
 {-
 TODO Specify lazy semantics for Log fields. E.g., logging a message containing
@@ -235,14 +249,18 @@ new' name sink act =
     -- exceptions afterwards.
     flip Ex.finally (mute (atomically (flushDi di))) $
       catchSync (act di) $ \se -> do
-         syst <- Ex.onException (Time.getSystemTime) (Ex.throw se)
-         -- We mute because it doesn't really matter if this fails.
-         mute $ atomically $ writeTQueue tqLogs $ Log
-           { logTime = syst, logLevel = Alert
-           , logPath = Attr "exception"
-               (fromString (Ex.displayException se)) (diPath di)
-           , logMessage = "Unhandled exception. \
-                          \Logging system will stop now." }
+         case Ex.fromException se of
+            Just (_ :: System.Exit.ExitCode) -> do
+               pure () -- 'act' requested an exit, we'll exit as requested.
+            Nothing -> do
+               syst <- Ex.onException (Time.getSystemTime) (Ex.throw se)
+               -- We mute because it doesn't really matter if this fails.
+               mute $ atomically $ writeTQueue tqLogs $ Log
+                 { logTime = syst, logLevel = Alert
+                 , logPath = Attr "exception"
+                     (fromString (Ex.displayException se)) (diPath di)
+                 , logMessage = "Unhandled exception. \
+                                \Logging system will stop now." }
          Ex.throw se
   where
     worker :: (Log -> IO ()) -> TQueue Log -> IO ()
@@ -621,6 +639,52 @@ instance (Monoid w, MonadDi m) => MonadDi (RWSS.RWST r w s m) where
 instance (Monoid w, MonadDi m) => MonadDi (RWSL.RWST r w s m) where
   local f = \(RWSL.RWST gma) -> RWSL.RWST (\r s -> local f (gma r s))
   {-# INLINE local #-}
+
+instance MonadDi m => MonadDi (P.Proxy a' a b' b m) where
+  {-# INLINABLE local #-}
+  local f = \case
+     P.Request a' fa -> P.Request a'(\a -> local f (fa  a ))
+     P.Respond b fb' -> P.Respond b (\b' -> local f (fb' b'))
+     P.Pure r -> P.Pure r
+     P.M m -> P.M (local f m >>= \r -> pure (local f r))
+
+--------------------------------------------------------------------------------
+
+-- | Run a 'LogLineParser' on a stream of raw input containing one or more
+-- lines.
+runLogLineParser
+  :: forall m a
+  .  Monad m
+  => LogLineParser
+  -> P.Producer B.ByteString m a
+  -- ^ It is not necessary for each of these 'B.ByteStrings' to contain exactly
+  -- one line. 'runLogLineParser' will break the input into lines before
+  -- processing it. In other words, something like 'Pb.stdin' is acceptable
+  -- here.
+  -> P.Producer (Either String Log) m a
+  -- If it's possible to par
+runLogLineParser (LogLineParserUtf8 parser0) = \pb0 -> do
+    let pb1 = pb0 P.>-> Pb.filter (/= 13)  -- We discard '\r' from input.
+    iterTM fline (view (Pb.splits 10) pb1) -- We split on '\n' and parse.
+  where
+    -- The outer producer produces a line of input, in chunks.
+    fline :: P.Producer B.ByteString m (P.Producer (Either String Log) m a)
+          -> P.Producer (Either String Log) m a
+    fline = \pb0 -> do
+      (yel, pb1) <- lift (SS.runStateT parser1 pb0)
+      mapM_ P.yield yel
+      lift (Pb.nextByte pb1) >>= \case
+        Left pel0 -> pel0
+        Right (_, pb2) -> do
+           P.yield (Left ("Skipping leftover line input"))
+           join (lift (drainProducer pb2))
+    parser1 :: Pb.Parser B.ByteString m (Maybe (Either String Log))
+    parser1 = do
+      Pb.isEndOfBytes >>= \case
+         True -> pure Nothing
+         False -> fmap Just parser0
+    {-# INLINE fline #-}
+    {-# INLINE parser1 #-}
 
 --------------------------------------------------------------------------------
 

@@ -1,4 +1,6 @@
+{-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE StandaloneDeriving #-}
 
 module Di.Types
@@ -16,7 +18,7 @@ module Di.Types
  , LogBlobRenderer(LogBlobRenderer)
  ) where
 
-import qualified Data.Attoparsec.ByteString as AB
+import qualified Data.ByteString as B
 import qualified Data.ByteString.Builder as BB
 import Data.Semigroup (Semigroup)
 import qualified Data.Text as T
@@ -24,6 +26,7 @@ import qualified Data.Text.Lazy as TL
 import Data.String (IsString(fromString))
 import qualified Data.Time.Clock.System as Time
 import Control.Concurrent.STM (TQueue)
+import qualified Pipes.Parse as Pp
 
 --------------------------------------------------------------------------------
 
@@ -195,15 +198,23 @@ pathRoot (Root x) = Root x
 
 -- | How to parse a 'Log' from a line of text.
 data LogLineParser
-  = LogLineParserUtf8 !(AB.Parser Log)
-  -- ^ Parse a 'Log' from some UTF-8 bytes.
+  = LogLineParserUtf8
+      !(forall m. Monad m => Pp.Parser B.ByteString m (Either String Log))
+  -- ^ Parse a 'Log' from some UTF-8 bytes. The parser can asume the given input
+  -- is non-empty, and contains an entire line without trailing @\"\\r\\n\"@
+  -- nor @\"\\n\"@.
+  --
+  -- If the parser doesn't consume the entire input, then those leftovers are
+  -- discarded.
+  --
+  -- If parsing fails, the returned 'String' should give a hint of why.
 
 --------------------------------------------------------------------------------
 
 -- | How to render a 'Log' as a line of text.
 data LogLineRenderer
   = LogLineRendererUtf8 !(Bool -> Log -> BB.Builder)
-  -- ^ The returned bytes must not contain a trailing newline.
+  -- ^ The returned bytes must not contain a leading nor trailing newline.
   --
   -- The 'Bool' tells whether we are trying to write these bytes to a terminal
   -- that supports ANSI colors.
