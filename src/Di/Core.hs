@@ -9,7 +9,6 @@ module Di.Core
  , push
  , filter
  , contralevel
- , contrapath
  , contramsg
  ) where
 
@@ -66,8 +65,10 @@ import qualified System.IO as IO
 data Di level path msg = Di
   { _diLog :: Time.UTCTime -> level -> path -> msg -> IO ()
     -- ^ Low level logging function.
-  , _diFilter :: level -> Bool
-    -- ^ Whether a particular message @level@ should be logged or not.
+  , _diFilter :: level -> path -> msg -> Bool
+    -- ^ Whether a particular message should be logged or not.
+  , _diPath :: path
+    -- ^ The current path
   , _diLogs :: TQueue (IO ())
     -- ^ Work queue. This queue keeps fully applied '_diLog' calls.
   }
@@ -79,11 +80,11 @@ data Di level path msg = Di
 --
 -- /Note:/ There's no need to "release" the obtained 'Di'.
 mkDi
-  :: MonadIO m
+  :: (MonadIO m, Monoid path)
   => (Time.UTCTime -> level -> path -> msg -> IO ())
   -> m (Di level path msg)  -- ^
 mkDi f = liftIO $ do
-   di <- Di f (const True) <$> newTQueueIO
+   di <- Di f (\_ _ _ -> True) mempty <$> newTQueueIO
    me <- myThreadId
    _ <- forkFinally (worker di) (either (Ex.throwTo me) pure)
    pure di
@@ -115,10 +116,10 @@ mkDi f = liftIO $ do
 -- action given to 'mkDi') will be thrown from 'log'. Instead, those will be
 -- recorded to 'IO.stderr' and ignored.
 log :: (MonadIO m, Monoid path) => Di level path msg -> level -> msg -> m ()
-log (Di dLog dFilter dLogs) !l = \(!m) ->
-   when (dFilter l) $ liftIO $ do
+log (Di dLog dFilter dPath dLogs) !l = \(!m) ->
+   when (dFilter l dPath m) $ liftIO $ do
       ts <- Time.getCurrentTime
-      atomically $ writeTQueue dLogs $! dLog ts l mempty m
+      atomically $ writeTQueue dLogs $! dLog ts l dPath m
 {-# INLINABLE log #-}
 
 
@@ -138,13 +139,13 @@ flush di = liftIO (atomically (check =<< isEmptyTQueue (_diLogs di)))
 -- Identity:
 --
 -- @
--- 'filter' ('const' 'True')    ==   'id'
+-- 'filter' (\\_ _ _ -> 'True')    ==   'id'
 -- @
 --
 -- Composition:
 --
 -- @
--- 'filter' ('Control.Applicative.liftA2' (&&) f g)   ==   'filter' f . 'filter' g
+-- 'filter' (\\l p m -> f l p m && g l p m)   ==   'filter' f . 'filter' g
 -- @
 --
 -- Conmutativity:
@@ -152,8 +153,14 @@ flush di = liftIO (atomically (check =<< isEmptyTQueue (_diLogs di)))
 -- @
 -- 'filter' f . 'filter' g    ==    'filter' g . 'filter' f
 -- @
-filter :: (level -> Bool) -> Di level path msg -> Di level path msg
-filter f = \di -> di { _diFilter = \l -> f l && _diFilter di l }
+--
+-- 'filter' and 'push' commute:
+--
+-- @
+-- 'filter' f . 'push' p   ==    'push' p . 'filter' f
+-- @
+filter :: (level -> path -> msg -> Bool) -> Di level path msg -> Di level path msg
+filter f = \di -> di { _diFilter = \l p m -> f l p m && _diFilter di l p m}
 {-# INLINABLE filter #-}
 
 
@@ -171,8 +178,8 @@ filter f = \di -> di { _diFilter = \l -> f l && _diFilter di l }
 -- 'push' (a <> b)   ==   'push' b . 'push' a
 -- @
 push :: Monoid path => path -> Di level path msg -> Di level path msg
-push ps = \(Di dLog dFilter dLogs) ->
-  Di (\ts l p1 m -> dLog ts l (ps <> p1) m) dFilter dLogs
+push ps = \(Di dLog dFilter dPath dLogs) ->
+  Di dLog dFilter (dPath <> ps) dLogs
 {-# INLINABLE push #-}
 
 
@@ -202,39 +209,9 @@ push ps = \(Di dLog dFilter dLogs) ->
 -- 'contralevel' (f . g)   ==   'contralevel' g . 'contralevel' f
 -- @
 contralevel :: (level -> level') -> Di level' path msg  -> Di level path msg
-contralevel f = \(Di dLog dFilter dLogs) ->
-  Di (\ts l p m -> dLog ts (f l) p m) (\l -> dFilter (f l)) dLogs
+contralevel f = \(Di dLog dFilter dPath dLogs) ->
+  Di (\ts l p m -> dLog ts (f l) p m) (\l p m -> dFilter (f l) p m) dPath dLogs
 {-# INLINABLE contralevel #-}
-
--- | A 'Di' is contravariant in its @path@ argument.
---
--- This function is used to go from a /more general/ to a /less specific/ type
--- of @path@. For example, @['Int']@ is a less general type than @['String']@,
--- since the former clearly conveys the idea of a list of numbers, whereas the
--- latter could be a list of anything that is representable as 'String', such as
--- names of fruits and poems. We can convert from the more general to the less
--- general @path@ type using this 'contrapath' function:
---
--- @
--- 'contrapath' ('map' 'show') (di :: 'Di' level ['String'] msg)
---     :: 'Di' ['Int'] msg
--- @
---
--- Identity:
---
--- @
--- 'contrapath' 'id'   ==   'id'
--- @
---
--- Composition:
---
--- @
--- 'contrapath' (f . g)   ==   'contrapath' g . 'contrapath' f
--- @
-contrapath :: (path -> path') -> Di level path' msg  -> Di level path msg
-contrapath f = \(Di dLog dFilter dLogs) ->
-  Di (\ts l p m -> dLog ts l (f p) m) dFilter dLogs
-{-# INLINABLE contrapath #-}
 
 -- | A 'Di' is contravariant in its @msg@ argument.
 --
@@ -262,8 +239,8 @@ contrapath f = \(Di dLog dFilter dLogs) ->
 -- 'contramsg' (f . g)   ==   'contramsg' g . 'contramsg' f
 -- @
 contramsg :: (msg -> msg') -> Di level path msg' -> Di level path msg
-contramsg f = \(Di dLog dFilter dLogs) ->
-  Di (\ts l p m -> dLog ts l p (f m)) dFilter dLogs
+contramsg f = \(Di dLog dFilter dPath dLogs) ->
+  Di (\ts l p m -> dLog ts l p (f m)) (\l p m -> dFilter l p (f m)) dPath dLogs
 {-# INLINABLE contramsg #-}
 
 --------------------------------------------------------------------------------

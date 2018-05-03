@@ -17,7 +17,6 @@ module Di
  , push
  , filter
  , contralevel
- , contrapath
  , contramsg
    -- * Backends
  , mkDi
@@ -28,7 +27,7 @@ module Di
 import Prelude hiding (filter, log)
 
 import Di.Core
-  (Di, log, flush, push, filter, contralevel, contrapath, contramsg, mkDi)
+  (Di, log, flush, push, filter, contralevel, contramsg, mkDi)
 import qualified Di.Backend as B
 
 

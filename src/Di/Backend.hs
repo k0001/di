@@ -13,7 +13,7 @@ import Prelude hiding (log, filter)
 import qualified System.IO as IO
 import Data.Semigroup (Semigroup(..))
 
-import Di.Core (Di, mkDi, contrapath)
+import Di.Core (Di, mkDi)
 
 --------------------------------------------------------------------------------
 
@@ -70,13 +70,12 @@ mkDiStringHandle
   -> m (Di String [String] String)
 mkDiStringHandle h = liftIO $ do
     IO.hSetBuffering h IO.LineBuffering
-    fmap (contrapath (mconcat . map stringPathSingleton)) $ do
-       mkDi $ \ts l p m -> do
-          IO.hPutStrLn h $ mconcat
-             [ l, " ", renderIso8601 ts
-             , if p == mempty then "" else (" " <> unStringPath p)
-             , ": ", noBreaks m ]
-          IO.hFlush h
+    mkDi $ \ts l p m -> do
+      IO.hPutStrLn h $ mconcat
+        [ l, " ", renderIso8601 ts
+        , if p == mempty then "" else (" " <> unStringPath (foldMap stringPathSingleton p))
+        , ": ", noBreaks m ]
+      IO.hFlush h
   where
     noBreaks :: String -> String
     noBreaks = concatMap $ \case

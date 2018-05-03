@@ -1,3 +1,9 @@
+# Version 0.4
+
+* BREAKING CHANGE: Remove `contrapath`. This was necessary to allow filtering based on path.
+
+* BREAKING CHANGE: Add path and msg as arguments to filter function.
+
 # Version 0.3
 
 * BREAKING CHANGE: `mkDiTextStderr` and `mkDiStringHandle` return a `Di String
