@@ -6,11 +6,12 @@ module Di.Backend
  ) where
 
 import Control.Monad.IO.Class (MonadIO, liftIO)
-import Data.Monoid (mconcat, mappend, (<>))
+import Data.Monoid (mconcat, mappend)
 import Data.String (IsString(fromString))
 import qualified Data.Time as Time
 import Prelude hiding (log, filter)
 import qualified System.IO as IO
+import Data.Semigroup (Semigroup(..))
 
 import Di.Core (Di, mkDi, contrapath)
 
@@ -36,11 +37,14 @@ stringPathSingleton = \s -> StringPath (map f s)
                   '\r' -> '_'
                   c    -> c
 
+instance Semigroup StringPath where
+  StringPath "" <> b = b
+  a <> StringPath "" = a
+  StringPath a <> StringPath b = StringPath (a <> "/" <> b)
+
 instance Monoid StringPath where
   mempty = StringPath ""
-  mappend (StringPath "") b = b
-  mappend a (StringPath "") = a
-  mappend (StringPath a) (StringPath b) = StringPath (a <> "/" <> b)
+  mappend = (<>)
 
 -- | 'String's are written to 'IO.Handle' using the 'IO.Handle''s locale
 -- encoding.
