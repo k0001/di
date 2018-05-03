@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP #-}
 module Main where
 
+import Debug.Trace
 import Control.Applicative (liftA2)
 import qualified Control.Exception as Ex
 import Control.Concurrent.STM
@@ -61,21 +62,6 @@ tt = Tasty.testGroup "di"
           -- Checking that di0 still works
           Di.log di0 "1" ""
 
-  , HU.testCase "contrapath" $ do
-       let x = [("","",""), ("","1",""), ("","1",""), ("","1",""), ("","2",""), ("","2",""), ("","","")]
-           n = Sum (1 :: Int)
-       expect x $ \di0 -> do
-          Di.log di0 "" ""
-          Di.log (Di.push "1" di0) "" ""
-          -- Identity
-          Di.log (Di.push "1" (Di.contrapath id di0)) "" ""
-          -- Composition
-          Di.log (Di.push n (Di.contrapath (show . getSum) di0)) "" ""
-          Di.log (Di.push n ((Di.contrapath (mappend n) . Di.contrapath (show . getSum)) di0)) "" ""
-          Di.log (Di.push n (Di.contrapath (show . getSum . mappend n) di0)) "" ""
-          -- Checking that di0 still works
-          Di.log di0 "" ""
-
   , HU.testCase "contramsg" $ do
        let x = [("","","1"), ("","","1"), ("","","1"), ("","","2"), ("","","2"),  ("","","1")]
            n = 1 :: Int
@@ -91,27 +77,32 @@ tt = Tasty.testGroup "di"
           Di.log di0 "" "1"
 
   , HU.testCase "filter" $ do
-       let x = [("1","","a"), ("2","","c"), ("1","","d"), ("3","","g"), ("3","","j"), ("3","","m"), ("1","","n")]
+       let x = [("1","","a"), ("2","","c"), ("1","","d"), ("3","","g"), ("3","","j"), ("3","","m"), ("1", "1", "o"), ("1", "1", "p"), ("1","","q")]
        expect x $ \di0 -> do
           Di.log di0 "1" "a"
           -- Predicates
-          Di.log (Di.filter (/= "1") di0) "1" "b"
-          Di.log (Di.filter (/= "1") di0) "2" "c"
+          Di.log (Di.filter (\l _ _ -> l /= "1") di0) "1" "b"
+          Di.log (Di.filter (\l _ _ -> l /= "1") di0) "2" "c"
           -- Identity
-          Di.log (Di.filter (const True) di0) "1" "d"
+          Di.log (Di.filter (\_ _ _ -> True) di0) "1" "d"
           -- Composition
-          Di.log ((Di.filter (/= "1") . Di.filter (/= "2")) di0) "1" "e"
-          Di.log ((Di.filter (/= "1") . Di.filter (/= "2")) di0) "2" "f"
-          Di.log ((Di.filter (/= "1") . Di.filter (/= "2")) di0) "3" "g"
-          Di.log (Di.filter (liftA2 (&&) (/= "1") (/= "2")) di0) "1" "h"
-          Di.log (Di.filter (liftA2 (&&) (/= "1") (/= "2")) di0) "2" "i"
-          Di.log (Di.filter (liftA2 (&&) (/= "1") (/= "2")) di0) "3" "j"
+          Di.log ((Di.filter (\l _ _ -> l /= "1") . Di.filter (\l _ _ -> l /= "2")) di0) "1" "e"
+          Di.log ((Di.filter (\l _ _ -> l /= "1") . Di.filter (\l _ _ -> l /= "2")) di0) "2" "f"
+          Di.log ((Di.filter (\l _ _ -> l /= "1") . Di.filter (\l _ _ -> l /= "2")) di0) "3" "g"
+          Di.log (Di.filter (\l _ _ -> l /= "1" && l /= "2") di0) "1" "h"
+          Di.log (Di.filter (\l _ _ -> l /= "1" && l /= "2") di0) "2" "i"
+          Di.log (Di.filter (\l _ _ -> l /= "1" && l /= "2") di0) "3" "j"
           -- Conmutativity (c.f., "e" "f" "g")
-          Di.log ((Di.filter (/= "2") . Di.filter (/= "1")) di0) "1" "k"
-          Di.log ((Di.filter (/= "2") . Di.filter (/= "1")) di0) "2" "l"
-          Di.log ((Di.filter (/= "2") . Di.filter (/= "1")) di0) "3" "m"
+          Di.log ((Di.filter (\l _ _ -> l /= "2") . Di.filter (\l _ _ -> l /= "1")) di0) "1" "k"
+          Di.log ((Di.filter (\l _ _ -> l /= "2") . Di.filter (\l _ _ -> l /= "1")) di0) "2" "l"
+          Di.log ((Di.filter (\l _ _ -> l /= "2") . Di.filter (\l _ _ -> l /= "1")) di0) "3" "m"
+          -- Filter based on path
+          Di.log ((Di.filter (\_ p _ -> p == "1") di0)) "1" "n"
+          Di.log ((Di.filter (\_ p _ -> p == "1") (Di.push "1" di0))) "1" "o"
+          -- Push and filter commute
+          Di.log ((Di.push "1" (Di.filter (\_ p _ -> p == "1") di0))) "1" "p"
           -- Checking that di0 still works
-          Di.log di0 "1" "n"
+          Di.log di0 "1" "q"
   ]
 
 expect :: [(String, String, String)] -> (Di String String String -> IO a) -> IO a
