@@ -21,9 +21,9 @@ import qualified Data.Time.Clock.System as Time
 import Data.Word (Word8, Word16, Word32)
 
 import Di.Types as Di
- (Log(Log), Message(Message),
+ (Log(Log), Message, message,
   Level(Debug, Info, Notice, Warning, Error, Critical, Alert, Emergency),
-  Path(Attr, Push, Root), Segment(Segment), Key(Key), Value(Value))
+  Path(Attr, Push, Root), Segment, segment, Key, key, Value, value)
 
 --------------------------------------------------------------------------------
 
@@ -34,7 +34,7 @@ parseLog = (AB.<?> "parseLog") $ do
   l <- AB.skipWhile (== 32) *> pLevel
   m <- AB.skipWhile (== 32) *> pMessage
   -- Make sure we reached the end or a newline.
-  void AB.atEnd <|> void (AB.word8 10) <|> void (AB.word8 13 >> AB.word8 10)
+  -- void AB.atEnd <|> void (AB.word8 10) <|> void (AB.word8 13 >> AB.word8 10)
   pure (Log (Time.utcToSystemTime t) l p m)
 
 pIso8601 :: AB.Parser Time.UTCTime
@@ -88,7 +88,7 @@ pNum9Digits = (AB.<?> "pNum9Digits") $ do
 
 pLevel :: AB.Parser Di.Level
 {-# INLINE pLevel #-}
-pLevel = (AB.<?> "pLevel") $
+pLevel = (AB.<?> "pLevel")
   -- In decreasing frequency we expect logs to happen.
   -- We expect 'Debug' to mostly be muted, so 'Info' is prefered.
   (AB.string "INFO"      $> Di.Info)     <|>
@@ -108,38 +108,38 @@ pPath = (AB.<?> "pPath") $ do
     {-# INLINE pPush #-}
     pPush :: Di.Path -> AB.Parser Di.Path
     pPush path = (AB.<?> "pPush") $ do
-      AB.skipWhile (== 32) AB.<?> ":space:"
-      Di.Push <$> pSegment <*> pure path
+      seg <- pSegment <* AB.skipWhile (== 32)
+      pure (Di.Push seg path)
     {-# INLINE pAttr #-}
     pAttr :: Di.Path -> AB.Parser Di.Path
     pAttr path = do
-      AB.skipWhile (== 32) AB.<?> ":space:"
-      key <- pKey
-      AB.skip (== 61) AB.<?> "="
-      value <- pValue
+      key <- pKey <* AB.skip (== 61)
+      value <- pValue <* AB.skipWhile (== 32)
       pure (Di.Attr key value path)
 
 pSegment :: AB.Parser Di.Segment
 pSegment = (AB.<?> "pSegment") $ do
   AB.skip (== 47) AB.<?> "/"
   bl <- pUtf8LtoL =<< pDecodePercents =<< AB.takeWhile (/= 32) -- :space:
-  pure (Di.Segment (TL.toStrict bl))
+  pure (Di.segment (TL.toStrict bl))
 
 pKey :: AB.Parser Di.Key
 pKey = (AB.<?> "pKey") $ do
-  bl <- pUtf8LtoL =<< pDecodePercents =<< AB.takeWhile (/= 61) -- =
-  pure (Di.Key (TL.toStrict bl))
+
+  bl <- pUtf8LtoL =<< pDecodePercents
+          =<< AB.takeWhile (\w -> w /= 61 && w /= 32) -- '=' or :space:
+  pure (Di.key (TL.toStrict bl))
 
 pValue :: AB.Parser Di.Value
 pValue = (AB.<?> "pValue") $ do
   bl <- pUtf8LtoL =<< pDecodePercents =<< AB.takeWhile (/= 32) -- :space:
-  pure (Di.Value bl)
+  pure (Di.value bl)
 
 pMessage :: AB.Parser Di.Message
 {-# INLINE pMessage #-}
 pMessage = (AB.<?> "pMessage") $ do
   tl <- pUtf8LtoL =<< pDecodePercentsL =<< AB.takeLazyByteString
-  pure (Di.Message tl)
+  pure (Di.message tl)
 
 pUtf8LtoL :: BL.ByteString -> AB.Parser TL.Text
 {-# INLINE pUtf8LtoL #-}
@@ -188,4 +188,25 @@ pDecodePercentsL = \bl ->
                 Just _  -> AB.takeWhile1 (\w -> w /= 37)
              bls <- many k <* AB.endOfInput
              pure (mconcat (BL.fromStrict b : bls))
+
+-- | Remove ANSI escapes. This is not complete, but it covers the ANSI codes we
+-- use.
+removeAnsiEscapes :: B.ByteString -> B.ByteString
+removeAnsiEscapes b0 = do
+    case AB.parseOnly p b0 of
+       Right b1 -> b1
+       Left e -> error ("removeAnsiEscapes: unexpected " ++ e)
+  where
+    p :: AB.Parser B.ByteString
+    p = fmap B.concat $ many $
+          (AB.takeWhile1 (/= 27)) <|>
+          (pAnsiEscape $> "") <|>
+          (AB.satisfy (== 27) $> "")
+    pAnsiEscape :: AB.Parser ()
+    pAnsiEscape = (AB.<?> "pAnsiEscape") $ do
+      AB.satisfy (== 27) AB.<?> "a" -- '\ESC'
+      AB.satisfy (== 91) AB.<?> "b" -- '['
+      AB.takeWhile (\w -> w == 59 || (w >= 48 && w <= 57)) -- ';' '0'-'9'
+      AB.satisfy (== 109) AB.<?> "d" -- 'm'
+      pure ()
 

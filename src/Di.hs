@@ -37,6 +37,7 @@ module Di
  , DiT
  , runDiT
  , runDiT'
+ , hoistDiT
 
    -- * 'MonadDi'
  , MonadDi(local, ask, natSTM)
@@ -60,12 +61,12 @@ module Di
 
    -- * Extras
  , Log(Log, logTime, logLevel, logPath, logMessage)
- , Message(Message)
+ , Message, message, unMessage
  , Level(Debug, Info, Notice, Warning, Error, Critical, Alert, Emergency)
  , Path(Attr, Push, Root)
- , Segment(Segment)
- , Key(Key)
- , Value(Value)
+ , Segment, segment, unSegment
+ , Key, key, unKey
+ , Value, value, unValue
  , Sink(Sink)
  , withSink
  , sinkFallback
@@ -123,10 +124,13 @@ import Di.Misc (mute, muteSync, catchSync, getSystemTimeSTM, drainProducer)
 import Di.Sink
   (Sink(Sink), withSink, stderrLines, handleLines, sinkFallback, withSink)
 import Di.Types
-  (Log(Log, logTime, logLevel, logPath, logMessage), Message(Message),
+  (Log(Log, logTime, logLevel, logPath, logMessage),
    Level(Debug, Info, Notice, Warning, Error, Critical, Alert, Emergency),
    Path(Attr, Push, Root),
-   Segment(Segment), Key(Key), Value(Value),
+   Message, message, unMessage,
+   Segment, segment, unSegment,
+   Key, key, unKey,
+   Value, value, unValue,
    Di(Di, diMax, diPath, diLogs),
    LogLineParser(LogLineParserUtf8),
    LogLineRenderer(LogLineRendererUtf8),
@@ -452,7 +456,7 @@ class Monad m => MonadDi m where
   -- Identity law:
   --
   -- @
-  -- 'local' 'id' 'ask'  ==  'ask'
+  -- 'local' 'id' x  ==  x
   -- @
   --
   -- Distributive law:
@@ -464,7 +468,7 @@ class Monad m => MonadDi m where
   -- Idempotence law:
   --
   -- @
-  -- 'local' f ('pure' ()) '>>=' 'ask'  ==  'ask'
+  -- 'local' f ('pure' ()) '>>' x  ==  x
   -- @
   local :: (Di -> Di) -> m a -> m a
 
@@ -491,10 +495,6 @@ newtype DiT m a = DiT (ReaderT (Di, H STM m) m a)
 instance MonadTrans DiT where
   lift = \x -> DiT (lift x)
   {-# INLINE lift #-}
-
--- TODO: we can't have a MFunctor DiT instance because of the natural
--- transformation inside 'DiT'. We need to move that natural transformation
--- out.
 
 -- | Like 'runDiT'', but specialized to run with an underlying 'MonadIO'.
 --
@@ -561,6 +561,16 @@ runDiT = runDiT' (\x -> liftIO (atomically x))
 runDiT' :: (forall x. STM x -> m x) -> Di -> DiT m a -> m a
 runDiT' h = \di -> \(DiT (ReaderT f)) -> f (di, H h)
 {-# INLINE runDiT' #-}
+
+-- | Lift a monad morphism from @f@ to @g@ to a monad morphism from @'DiT' f@ to
+-- @'DiT' g@.
+hoistDiT
+  :: (forall x. g x -> f x) -- ^ Natural transformation from @g@ to @f@.
+  -> (forall x. f x -> g x) -- ^ Monad morphism from @f@ to @g@.
+  -> (DiT f a -> DiT g a)   -- ^ Monad morphism from @'DiT' f@ to @'DiT' g@.
+{-# INLINE hoistDiT #-}
+hoistDiT hgf hfg = \(DiT (ReaderT f)) ->
+   DiT (ReaderT (\(di, H hstmg) -> hfg (f (di, H (\stm -> hgf (hstmg stm))))))
 
 instance MonadReader r m => MonadReader r (DiT m) where
   ask = DiT (ReaderT (\_ -> Reader.ask))

@@ -5,12 +5,12 @@
 
 module Di.Types
  ( Log(Log, logTime, logLevel, logPath, logMessage)
- , Message(Message)
+ , Message, message, unMessage
  , Level(Debug, Info, Notice, Warning, Error, Critical, Alert, Emergency)
  , Path(Attr, Push, Root)
- , Segment(Segment)
- , Key(Key)
- , Value(Value)
+ , Segment, segment, unSegment
+ , Key, key, unKey
+ , Value, value, unValue
  , Di(Di, diMax, diPath, diLogs)
  , LogLineParser(LogLineParserUtf8)
  , LogLineRenderer(LogLineRendererUtf8)
@@ -47,12 +47,25 @@ data Log = Log
 -- \"foo\" :: 'Message'
 -- @
 --
--- Otherwise, you can use 'fromString' or the 'Message' constructor directly.
+-- Please keep in mind that 'Message' will always strip surrounding whitespace.
+-- That is:
+--
+-- @
+-- \"x\" :: 'Message'  ==  \" x\"  == \"x \" == \" x \"
+-- @
 newtype Message = Message TL.Text
   deriving (Eq, Show)
 
+message :: TL.Text -> Message
+message = Message . TL.dropAround (== ' ')
+{-# INLINE message #-}
+
+unMessage :: Message -> TL.Text
+unMessage = \(Message x) -> x
+{-# INLINE unMessage #-}
+
 instance IsString Message where
-  fromString = Message . TL.pack
+  fromString = message . TL.pack
   {-# INLINE fromString #-}
 
 instance Semigroup Message
@@ -114,8 +127,16 @@ deriving instance Ord Level
 newtype Segment = Segment T.Text
   deriving (Eq, Show)
 
+segment :: T.Text -> Segment
+segment = Segment . T.dropAround (== ' ')
+{-# INLINE segment #-}
+
+unSegment :: Segment -> T.Text
+unSegment = \(Segment x) -> x
+{-# INLINE unSegment #-}
+
 instance IsString Segment where
-  fromString = Segment . T.pack
+  fromString = segment . T.pack
   {-# INLINE fromString #-}
 
 instance Semigroup Segment
@@ -136,12 +157,27 @@ instance Monoid Segment where
 -- \"foo\" :: 'Key'
 -- @
 --
--- Otherwise, you can use 'fromString' or the 'Key' constructor directly.
+-- Otherwise, you can use 'fromString' or the 'key' function.
+--
+-- Please keep in mind that 'Key' will always strip surrounding whitespace.
+-- That is:
+--
+-- @
+-- \"x\" :: 'Key'  ==  \" x\"  == \"x \" == \" x \"
+-- @
 newtype Key = Key T.Text
   deriving (Eq, Show)
 
+key :: T.Text -> Key
+key = Key . T.dropAround (== ' ')
+{-# INLINE key #-}
+
+unKey :: Key -> T.Text
+unKey = \(Key x) -> x
+{-# INLINE unKey #-}
+
 instance IsString Key where
-  fromString = Key . T.pack
+  fromString = key . T.pack
   {-# INLINE fromString #-}
 
 instance Semigroup Key
@@ -162,12 +198,27 @@ instance Monoid Key where
 -- \"foo\" :: 'Value'
 -- @
 --
--- Otherwise, you can use 'fromString' or the 'Value' constructor directly.
+-- Otherwise, you can use 'fromString' or the 'value' function.
+--
+-- Please keep in mind that 'value' will always strip surrounding whitespace.
+-- That is:
+--
+-- @
+-- \"x\" :: 'Value'  ==  \" x\"  == \"x \" == \" x \"
+-- @
 newtype Value = Value TL.Text
   deriving (Eq, Show)
 
+unValue :: Value -> TL.Text
+unValue = \(Value x) -> x
+{-# INLINE unValue #-}
+
+value :: TL.Text -> Value
+value = Value . TL.dropAround (== ' ')
+{-# INLINE value #-}
+
 instance IsString Value where
-  fromString = Value . TL.pack
+  fromString = value . TL.pack
   {-# INLINE fromString #-}
 
 instance Semigroup Value

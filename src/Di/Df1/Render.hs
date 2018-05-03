@@ -5,11 +5,16 @@
 module Di.Df1.Render
  ( renderLog
  , renderLogColor
+ , removeAnsiEscapes
  ) where
 
+import Control.Applicative ((<|>), many)
+import qualified Data.Attoparsec.ByteString.Lazy as ABL
 import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Builder.Prim as BBP
+import qualified Data.ByteString.Lazy as BL
 import Data.Function (fix)
+import Data.Functor (($>))
 import Data.Monoid ((<>))
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as TL
@@ -17,11 +22,12 @@ import qualified Data.Time as Time
 import qualified Data.Time.Clock.System as Time
 import Data.Word (Word8, Word32)
 import Prelude hiding (log, filter, error)
+import qualified Prelude
 
 import Di.Types
- (Log(Log), Message(Message),
+ (Log(Log), Message, unMessage,
   Level(Debug, Info, Notice, Warning, Error, Critical, Alert, Emergency),
-  Path(Attr, Push, Root), Segment(Segment), Key(Key), Value(Value))
+  Path(Attr, Push, Root), Segment, unSegment, Key, unKey, Value, unValue)
 
 --------------------------------------------------------------------------------
 
@@ -51,7 +57,7 @@ renderLogColor = \(Log syst lvl path msg) ->
 -- | Like 'renderLogColor', but without color.
 renderLog :: Log -> BB.Builder
 renderLog = \(Log syst lvl path msg) ->
-  renderIso8601 syst <> renderPath path <>
+  renderIso8601 syst <> space <> renderPath path <>
   level lvl <> space <> renderMessage msg
 
 -- | @'renderPathColor' a b c p@ renders @p@ using @a@ as the default color (for
@@ -77,7 +83,7 @@ renderPath = fix $ \f -> \case
 
 renderMessage :: Message -> BB.Builder
 {-# INLINE renderMessage #-}
-renderMessage (Message tl) = escapeMessage tl
+renderMessage = escapeMessage . unMessage
 
 escapeMessage :: TL.Text -> BB.Builder
 {-# INLINE escapeMessage #-}
@@ -88,15 +94,15 @@ escapeMessage = TL.encodeUtf8BuilderEscaped
 
 renderSegment :: Segment -> BB.Builder
 {-# INLINE renderSegment #-}
-renderSegment (Segment x) = escapeMetaL (TL.fromStrict x)
+renderSegment = escapeMetaL . TL.fromStrict . unSegment
 
 renderKey :: Key -> BB.Builder
 {-# INLINE renderKey #-}
-renderKey (Key x) = escapeMetaL (TL.fromStrict x)
+renderKey = escapeMetaL . TL.fromStrict . unKey
 
 renderValue :: Value -> BB.Builder
 {-# INLINE renderValue #-}
-renderValue (Value x) = escapeMetaL x
+renderValue = escapeMetaL . unValue
 
 -- | Escape metadata such as path segments, attribute keys or attribute values.
 escapeMetaL :: TL.Text -> BB.Builder
@@ -283,4 +289,31 @@ _zero7 = BB.string7 "0000000"
 _zero8 = BB.string7 "00000000"
 
 --------------------------------------------------------------------------------
+
+-- | Remove ANSI escapes. This is not complete, but it covers the ANSI codes we
+-- use. In particular:
+--
+-- @
+-- forall x.
+--    'BB.toByteString' . 'renderLog'
+--        == 'removeAnsiEscapes' . 'BB.toByteString' . 'renderLogColor'
+-- @
+removeAnsiEscapes :: BL.ByteString -> BL.ByteString
+removeAnsiEscapes b0 = do
+    case ABL.eitherResult (ABL.parse p b0) of
+       Right b1 -> b1
+       Left e -> Prelude.error ("removeAnsiEscapes: unexpected " ++ e)
+  where
+    p :: ABL.Parser BL.ByteString
+    p = fmap BL.fromChunks $ many $
+          (ABL.takeWhile1 (/= 27)) <|>
+          (pAnsiEscape $> "") <|>
+          (ABL.satisfy (== 27) $> "")
+    pAnsiEscape :: ABL.Parser ()
+    pAnsiEscape = (ABL.<?> "pAnsiEscape") $ do
+      ABL.satisfy (== 27)  -- '\ESC'
+      ABL.satisfy (== 91)  -- '['
+      ABL.takeWhile (\w -> w == 59 || (w >= 48 && w <= 57)) -- ';' '0'-'9'
+      ABL.satisfy (== 109) -- 'm'
+      pure ()
 

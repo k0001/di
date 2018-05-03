@@ -8,6 +8,7 @@ import qualified Control.Exception as Ex
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Concurrent.STM
   (STM, atomically, TQueue, newTQueue, writeTQueue, tryReadTQueue)
+import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Builder as BB
 import Data.Foldable (for_)
 import Data.Function (fix)
@@ -23,6 +24,7 @@ import qualified Test.Tasty.Runners as Tasty
 
 import qualified Di
 import qualified Di.Df1
+import qualified Di.Df1.Render
 import qualified Di.Types as Di (diLogs)
 import qualified Di.Gen
 
@@ -72,13 +74,21 @@ ttDi = Tasty.testGroup "di"
 
 ttDf1 :: Tasty.TestTree
 ttDf1 = Tasty.testGroup "df1"
-  [ QC.testProperty "Render/Parse roundtrip" $ do
+  [ Tasty.localOption (QC.QuickCheckTests 1000) $
+    QC.testProperty "Render/Parse roundtrip" $ do
       let Di.LogLineRendererUtf8 render = Di.Df1.render
       QC.forAll Di.Gen.genLog $ \log0 -> do
          let bl = BB.toLazyByteString (render False log0)
              p0 = Pb.fromLazy bl
              p1 = Di.runLogLineParser Di.Df1.parse p0
          [Right log0] === P.toList p1
+  , Tasty.localOption (QC.QuickCheckTests 1000) $
+    QC.testProperty "Color renders the same content" $ do
+      let Di.LogLineRendererUtf8 render = Di.Df1.render
+      QC.forAll Di.Gen.genLog $ \log0 -> do
+         let bl = BB.toLazyByteString (render False log0)
+             blColor = BB.toLazyByteString (render True log0)
+         bl === Di.Df1.Render.removeAnsiEscapes blColor
   ]
 
 --------------------------------------------------------------------------------

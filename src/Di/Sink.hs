@@ -17,6 +17,7 @@ import qualified Control.Exception as Ex
 import qualified Data.ByteString.Builder as BB
 import qualified Data.List as List
 import Data.Monoid ((<>))
+import Data.String (fromString)
 import qualified Data.Text.Lazy as TL
 import qualified Data.Time.Clock.System as Time
 import qualified System.IO as IO
@@ -30,7 +31,7 @@ import qualified System.Posix.IO
 import Di.Types
   (Log(Log,  logTime, logLevel, logPath, logMessage), Level(Error),
    LogLineRenderer(LogLineRendererUtf8), LogBlobRenderer(LogBlobRenderer),
-   Path(Root, Attr), Key(Key), Value(Value))
+   Path(Root, Attr))
 import Di.Misc (catchSync)
 
 --------------------------------------------------------------------------------
@@ -59,7 +60,7 @@ sinkFallback (Sink md) (Sink mf) = Sink $ do
     fallbackLog syst se = Log
       { logTime = syst, logLevel = Error
       , logPath = Attr
-          (Key "exception") (Value (TL.pack (Ex.displayException se))) Root
+          "exception" (fromString (Ex.displayException se)) Root
       , logMessage =
           "Got synchronous exception in desired Di Sink. The " <>
           "log message that couldn't be written as desired will " <>

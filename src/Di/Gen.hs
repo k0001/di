@@ -71,7 +71,7 @@ genPath = (!!) <$> genPaths <*> QC.choose (0, 30)
 
 genSystemTime :: QC.Gen Time.SystemTime
 genSystemTime = do
-  a <- fmap abs QC.arbitrary
+  a <- QC.choose (0, 253402300799) -- up to 4 digit years
   b <- QC.choose (0, 1000000000)
   pure (Time.MkSystemTime a b)
 
