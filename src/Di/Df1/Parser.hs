@@ -2,8 +2,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Di.Df1.Parser
- ( parseLog
- ) where
+ {- ( parseLog
+ ) -} where
 
 import Control.Applicative ((<|>), many, empty)
 import Control.Monad (void)
@@ -102,24 +102,38 @@ pLevel = (AB.<?> "pLevel") $
 
 pPath :: AB.Parser Di.Path
 {-# INLINE pPath #-}
-pPath = (AB.<?> "pLevel") $ do
+pPath = (AB.<?> "pPath") $ do
     fix (\k path -> ((pPush path <|> pAttr path) >>= k) <|> pure path) Root
   where
     {-# INLINE pPush #-}
     pPush :: Di.Path -> AB.Parser Di.Path
     pPush path = (AB.<?> "pPush") $ do
-      AB.skipWhile (== 32)  -- space
-      AB.skip (== 47) AB.<?> "/"
-      seg <- pUtf8LtoL =<< pDecodePercents =<< AB.takeWhile (/= 32)
-      pure (Di.Push (Di.Segment (TL.toStrict seg)) path)
+      AB.skipWhile (== 32) AB.<?> ":space:"
+      Di.Push <$> pSegment <*> pure path
     {-# INLINE pAttr #-}
     pAttr :: Di.Path -> AB.Parser Di.Path
     pAttr path = do
-      AB.skipWhile (== 32) -- space
-      key <- pUtf8LtoL =<< pDecodePercents =<< AB.takeWhile (/= 61)
+      AB.skipWhile (== 32) AB.<?> ":space:"
+      key <- pKey
       AB.skip (== 61) AB.<?> "="
-      val <- pUtf8LtoL =<< pDecodePercents =<< AB.takeWhile (/= 32)
-      pure (Di.Attr (Key (TL.toStrict key)) (Value val) path)
+      value <- pValue
+      pure (Di.Attr key value path)
+
+pSegment :: AB.Parser Di.Segment
+pSegment = (AB.<?> "pSegment") $ do
+  AB.skip (== 47) AB.<?> "/"
+  bl <- pUtf8LtoL =<< pDecodePercents =<< AB.takeWhile (/= 32) -- :space:
+  pure (Di.Segment (TL.toStrict bl))
+
+pKey :: AB.Parser Di.Key
+pKey = (AB.<?> "pKey") $ do
+  bl <- pUtf8LtoL =<< pDecodePercents =<< AB.takeWhile (/= 61) -- =
+  pure (Di.Key (TL.toStrict bl))
+
+pValue :: AB.Parser Di.Value
+pValue = (AB.<?> "pValue") $ do
+  bl <- pUtf8LtoL =<< pDecodePercents =<< AB.takeWhile (/= 32) -- :space:
+  pure (Di.Value bl)
 
 pMessage :: AB.Parser Di.Message
 {-# INLINE pMessage #-}

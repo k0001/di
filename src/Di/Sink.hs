@@ -53,10 +53,10 @@ sinkFallback (Sink md) (Sink mf) = Sink $ do
     pure $ (,) (Ex.onException cd cf) $ \log' -> do
        catchSync (wd log') $ \se -> do
           syst <- Time.getSystemTime `Ex.onException` wf log'
-          Ex.finally (wf (fallbackLog syst se log')) (wf log')
+          Ex.finally (wf (fallbackLog syst se)) (wf log')
   where
-    fallbackLog :: Time.SystemTime -> Ex.SomeException -> Log -> Log
-    fallbackLog syst se log' = Log
+    fallbackLog :: Time.SystemTime -> Ex.SomeException -> Log
+    fallbackLog syst se = Log
       { logTime = syst, logLevel = Error
       , logPath = Attr
           (Key "exception") (Value (TL.pack (Ex.displayException se))) Root

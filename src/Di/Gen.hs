@@ -25,7 +25,6 @@ module Di.Gen
 
 import Control.Concurrent.STM (atomically, writeTQueue)
 import Data.String (fromString)
-import qualified Data.List.NonEmpty as NEL
 import qualified Data.Time.Clock.System as Time
 import qualified System.IO
 import qualified Test.QuickCheck as QC

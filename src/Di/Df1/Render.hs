@@ -29,8 +29,8 @@ import Di.Types
 renderLogColor :: Log -> BB.Builder
 renderLogColor = \(Log syst lvl path msg) ->
  let t = renderIso8601 syst <> space
-     pDef = \fg -> renderPathColor fg fgBlue fgCyan path <> space
-     pRed = renderPathColor fgBlack fgWhite fgWhite path <> space
+     pDef = \fg -> renderPathColor fg fgBlue fgCyan path
+     pRed = renderPathColor fgBlack fgWhite fgWhite path
      m = space <> renderMessage msg <> reset
  in case lvl of
      Debug -> reset <> t <> pDef fgDefault <> fgDefault <> debug <> m
@@ -51,29 +51,28 @@ renderLogColor = \(Log syst lvl path msg) ->
 -- | Like 'renderLogColor', but without color.
 renderLog :: Log -> BB.Builder
 renderLog = \(Log syst lvl path msg) ->
-  renderIso8601 syst <> space <> renderPath path <> space <>
+  renderIso8601 syst <> renderPath path <>
   level lvl <> space <> renderMessage msg
 
 -- | @'renderPathColor' a b c p@ renders @p@ using @a@ as the default color (for
 -- things like whitespace or attribute values), @b@ as the color for path names,
--- and @c@ as the color for attribute keys.
-
--- This is rather ugly, but whatever.
+-- and @c@ as the color for attribute keys. This adds a trailing whitespace if
+-- necessary.
 renderPathColor :: BB.Builder -> BB.Builder -> BB.Builder -> Path -> BB.Builder
 {-# INLINE renderPathColor #-}
 renderPathColor defc pathc keyc = fix $ \f -> \case
   Attr k v p ->
-    f p <> defc <> space <> keyc <> renderKey k <>
-    defc <> equals <> renderValue v
-  Push s p -> f p <> defc <> space <> pathc <> slash <> renderSegment s
+    f p <> defc <> keyc <> renderKey k <>
+    defc <> equals <> renderValue v <> space
+  Push s p -> f p <> defc <> pathc <> slash <> renderSegment s <> space
   Root -> mempty
 
 -- | Like 'renderPathColor', but without color.
 renderPath :: Path -> BB.Builder
 {-# INLINE renderPath #-}
 renderPath = fix $ \f -> \case
-  Attr k v p -> f p <> space <> renderKey k <> equals <> renderValue v
-  Push s p -> f p <> space <> slash <> renderSegment s
+  Attr k v p -> f p <>renderKey k <> equals <> renderValue v <> space
+  Push s p -> f p <> slash <> renderSegment s <> space
   Root -> mempty
 
 renderMessage :: Message -> BB.Builder

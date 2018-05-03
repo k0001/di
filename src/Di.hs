@@ -387,18 +387,16 @@ flush = ask >>= \di -> natSTM (flushDi di)
 -- For example, @'max' 'Notice'@ will prevent messages with 'Level's 'Info'
 -- and 'Debug' from ever being loged through the resulting 'Di'.
 --
--- Notice that a use of 'max' won't impact subsequent uses of it. In practical
--- terms, this implies that an exclusion of 'Level's of lower importance can be
--- fully reverted by using 'max' again, giving it a lower importance 'Level' as
--- argument. This can be useful in case you want to temporarily mute some
--- “unimporant” messages. More generally:
+-- Notice that a use of 'max' can't be “undone” by the given action. That is, in
+-- @'max' x y@, the highest log level that @y@ will be able to produce is @x@.
+-- More generally:
 --
 -- @
 -- forall a b.
---    'max' a . 'max' b . 'max' a  ==  'id'
+--    'max' a . 'max' b  ==  'max' ('min' a b)  --  This is 'min' from "Prelude".
 -- @
 max :: MonadDi m => Level -> m a -> m a
-max !l = local (\di -> di { diMax = l })
+max !l = local (\di -> di { diMax = min l (diMax di) })
 {-# INLINE max #-}
 
 -- | Push a new @path@ to the 'Di'.
@@ -421,8 +419,6 @@ push s = local (\di -> di { diPath = Push s (diPath di) })
 attr :: MonadDi m => Key -> Value -> m a -> m a
 {-# INLINE attr #-}
 attr k v m = local (\di -> di { diPath = Attr k v (diPath di) }) m
-
-
 
 --------------------------------------------------------------------------------
 
@@ -686,33 +682,35 @@ runLogLineParser (LogLineParserUtf8 parser0) = \pb0 -> do
 test :: MonadDi m => m ()
 test = do
   max Debug $ do
-    notice "Running `test`"
-    debug "attr a"
-    attr "a" "b" $ do
-      debug "attr c"
-      attr "c" "d" $ do
-        debug "attr a again"
-        attr "a" "e" $ do
-          debug "push z"
-          push "z" $ do
-            debug "attr f"
-            attr "f" "g" $ do
-              debug "max Warning"
-              max Warning $ do
-                debug "IF YOU SEE THIS MESSAGE max DOESN'T WORK"
-                info "IF YOU SEE THIS MESSAGE max DOESN'T WORK"
-                notice "IF YOU SEE THIS MESSAGE max DOESN'T WORK"
-                warning "you should see this message"
-                error "you should see this message"
-                critical "you should see this message"
-                emergency "you should see this message"
-                warning "max Debug"
-                max Debug $ do
-                  debug "testing all levels"
-                  info "testing all levels"
-                  notice "testing all levels"
-                  warning "testing all levels"
-                  error "testing all levels"
-                  critical "testing all levels"
-                  alert "testing all levels"
-                  emergency "testing all levels"
+      notice "Running test"
+      debug "attr a"
+      attr "a" "b" $ do
+        debug "push z"
+        push "z" $ do
+          debug "attr c"
+          attr "c" "d" $ do
+            debug "attr a again"
+            attr "a" "e" $ do
+              debug "push y"
+              push "y" $ do
+                debug "attr f"
+                attr "f" "g" $ do
+                  debug "max Warning"
+                  max Warning $ do
+                    debug "IF YOU SEE THIS MESSAGE max DOESN'T WORK"
+                    info "IF YOU SEE THIS MESSAGE max DOESN'T WORK"
+                    notice "IF YOU SEE THIS MESSAGE max DOESN'T WORK"
+                    warning "you should see this message"
+                    error "you should see this message"
+                    critical "you should see this message"
+                    emergency "you should see this message"
+                    warning "max Debug"
+                    max Debug $ do
+                      debug "testing all levels"
+                      info "testing all levels"
+                      notice "testing all levels"
+                      warning "testing all levels"
+                      error "testing all levels"
+                      critical "testing all levels"
+                      alert "testing all levels"
+                      emergency "testing all levels"
