@@ -63,7 +63,6 @@ module Di
  , Message(Message)
  , Level(Debug, Info, Notice, Warning, Error, Critical, Alert, Emergency)
  , Path(Attr, Push, Root)
- , pathRoot
  , Segment(Segment)
  , Key(Key)
  , Value(Value)
@@ -126,7 +125,7 @@ import Di.Sink
 import Di.Types
   (Log(Log, logTime, logLevel, logPath, logMessage), Message(Message),
    Level(Debug, Info, Notice, Warning, Error, Critical, Alert, Emergency),
-   Path(Attr, Push, Root), pathRoot,
+   Path(Attr, Push, Root),
    Segment(Segment), Key(Key), Value(Value),
    Di(Di, diMax, diPath, diLogs),
    LogLineParser(LogLineParserUtf8),
@@ -206,7 +205,7 @@ TODO Rename MonadDi to MonadLog, DiT to LogT, Log to Request?
 -- line.
 --
 -- @
--- 'new' name  ==  'new'' name ('stderrLines' 'Di.Df1.render')
+-- 'new' ==  'new'' ('stderrLines' 'Di.Df1.render')
 -- @
 --
 -- You are supposed to call 'new' _only once per application_, and this one 'Di'
@@ -227,15 +226,11 @@ TODO Rename MonadDi to MonadLog, DiT to LogT, Log to Request?
 -- library needs to obtain a concrete 'Di', for example, to call 'runDiT' from
 -- a different thread, then it could get that 'Di' using @'Di.ask' :: 'MonadDi'
 -- m => m 'Di'@, or simply receive as an argument.
-new :: Segment -> (Di -> IO a) -> IO a
-new name act = new' name (stderrLines Di.Df1.render) act
+new :: (Di -> IO a) -> IO a
+new = new' (stderrLines Di.Df1.render)
 
-new'
-  :: Segment -- ^ Root segment name.
-  -> Sink
-  -> (Di -> IO a)
-  -> IO a
-new' name sink act =
+new' :: Sink -> (Di -> IO a) -> IO a
+new' sink act =
   withSink sink $ \write -> do
     tqLogs :: TQueue Log <- newTQueueIO
     -- Start worker thread, restarting in in case of sync exceptions (unlikely).
@@ -244,7 +239,7 @@ new' name sink act =
        Left se -> case Ex.asyncExceptionFromException se of
           Just (_ :: Ex.AsyncException) -> Ex.throwIO se
           Nothing -> k >> pure ()
-    let di = Di Debug (Root name) tqLogs
+    let di = Di Debug Root tqLogs
     -- Run 'act', silently flushing and logging any unhandled synchronous
     -- exceptions afterwards.
     flip Ex.finally (mute (atomically (flushDi di))) $

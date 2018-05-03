@@ -103,19 +103,16 @@ pLevel = (AB.<?> "pLevel") $
 pPath :: AB.Parser Di.Path
 {-# INLINE pPath #-}
 pPath = (AB.<?> "pLevel") $ do
-    pRoot >>= fix (\k path -> ((pPush path <|> pAttr path) >>= k) <|> pure path)
+    fix (\k path -> ((pPush path <|> pAttr path) >>= k) <|> pure path) Root
   where
-    pRoot :: AB.Parser Di.Path
-    pRoot = (AB.<?> "pRoot") $ do
-      AB.skip (== 47) AB.<?> "/"
-      seg <- pUtf8LtoL =<< pDecodePercents =<< AB.takeWhile (/= 32)
-      pure (Di.Root (Di.Segment (TL.toStrict seg)))
+    {-# INLINE pPush #-}
     pPush :: Di.Path -> AB.Parser Di.Path
     pPush path = (AB.<?> "pPush") $ do
       AB.skipWhile (== 32)  -- space
       AB.skip (== 47) AB.<?> "/"
       seg <- pUtf8LtoL =<< pDecodePercents =<< AB.takeWhile (/= 32)
       pure (Di.Push (Di.Segment (TL.toStrict seg)) path)
+    {-# INLINE pAttr #-}
     pAttr :: Di.Path -> AB.Parser Di.Path
     pAttr path = do
       AB.skipWhile (== 32) -- space
@@ -123,9 +120,6 @@ pPath = (AB.<?> "pLevel") $ do
       AB.skip (== 61) AB.<?> "="
       val <- pUtf8LtoL =<< pDecodePercents =<< AB.takeWhile (/= 32)
       pure (Di.Attr (Key (TL.toStrict key)) (Value val) path)
-    {-# INLINE pRoot #-}
-    {-# INLINE pPush #-}
-    {-# INLINE pAttr #-}
 
 pMessage :: AB.Parser Di.Message
 {-# INLINE pMessage #-}

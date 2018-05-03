@@ -11,7 +11,6 @@ module Di.Types
  , Segment(Segment)
  , Key(Key)
  , Value(Value)
- , pathRoot
  , Di(Di, diMax, diPath, diLogs)
  , LogLineParser(LogLineParserUtf8)
  , LogLineRenderer(LogLineRendererUtf8)
@@ -183,16 +182,10 @@ instance Monoid Value where
 -- We keep the strings as lazy 'TL.Text', even if short, so that we avoid
 -- calling 'TL.fromStrict' time and time again when rendering this 'Path'.
 data Path
-  = Root !Segment
+  = Root
   | Push !Segment !Path
   | Attr !Key !Value !Path
   deriving (Eq, Show)
-
--- | Finds the 'Root' of a 'Path'.
-pathRoot :: Path -> Path
-pathRoot (Attr _ _ p) = pathRoot p
-pathRoot (Push _ p) = pathRoot p
-pathRoot (Root x) = Root x
 
 --------------------------------------------------------------------------------
 

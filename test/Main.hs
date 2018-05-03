@@ -1,21 +1,43 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Main where
 
 import Control.Applicative (liftA2)
 import qualified Control.Exception as Ex
+import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Concurrent.STM
   (STM, atomically, TQueue, newTQueue, writeTQueue, tryReadTQueue)
 import Data.Foldable (for_)
 import Data.Function (fix)
 import Data.Monoid (Sum(Sum, getSum))
+import qualified Data.List.NonEmpty as NEL
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 import Test.Tasty.HUnit ((@?=))
 import qualified Test.Tasty.QuickCheck as QC
 import qualified Test.Tasty.Runners as Tasty
 
-import Di (Di)
 import qualified Di
+import qualified Di.Types as Di (diLogs)
+import qualified Di.Gen
+
+--------------------------------------------------------------------------------
+
+stmSink :: (Di.Log -> STM ()) -> Di.Sink
+stmSink m = Di.Sink (pure (pure (), atomically . m))
+
+withStmSink :: (Di.Sink -> IO a) -> IO ([Di.Log], a)
+withStmSink k = do
+  tq :: TQueue Di.Log <- atomically newTQueue
+  a <- k $ stmSink (writeTQueue tq)
+  logs <- atomically (drainTQueue tq)
+  pure (logs, a)
+
+-- | Like 'runDiT' but outputs the committed 'Di.Log's in the return value,
+-- rather than in stderr.
+runDiT_dump :: Di.DiT IO a -> IO ([Di.Log], a)
+runDiT_dump m = withStmSink $ \sink -> do
+  Di.new' sink (\di -> Di.runDiT di (m <* Di.flush))
 
 --------------------------------------------------------------------------------
 
@@ -27,13 +49,22 @@ main = Tasty.defaultMainWithIngredients
 
 tt :: Tasty.TestTree
 tt = Tasty.testGroup "di"
-  [ QC.testProperty "log" $ do
-      QC.forAll QC.arbitrary $ \lpms ->
+  [ QC.testProperty "Writing to diLogs sends to sink" $ do
+      QC.forAll Di.Gen.genLogs $ \logs0 -> do
+        let logs1 = take 100 logs0
         QC.ioProperty $ do
-          expect lpms $ \di0 -> do
-            for_ lpms $ \(l, p, m) -> do
-              Di.log (Di.push p di0) l m
+          (logs2, ()) <- runDiT_dump $ do
+             di <- Di.ask
+             -- NOTE: Don't do this at home, it's only for testing.
+             liftIO $ mapM_ (atomically . writeTQueue (Di.diLogs di)) logs1
+          logs2 @?= logs1
+--
+--  , QC.testProperty "MonadDi: log" $ do
+      -- QC.forAll
 
+
+
+{-
   , HU.testCase "push" $ do
        let x = [("","",""), ("","",""), ("","1",""), ("","12",""), ("","12",""), ("","","")]
        expect x $ \di0 -> do
@@ -112,18 +143,10 @@ tt = Tasty.testGroup "di"
           Di.log ((Di.filter (/= "2") . Di.filter (/= "1")) di0) "3" "m"
           -- Checking that di0 still works
           Di.log di0 "1" "n"
+          -}
   ]
 
-expect :: [(String, String, String)] -> (Di String String String -> IO a) -> IO a
-expect as0 k = Ex.bracket
-  (do tq <- atomically newTQueue
-      di <- Di.mkDi (\_ l p m -> atomically (writeTQueue tq (l, p, m)))
-      pure (tq, di))
-  (\(tq, di) -> do
-      Di.flush di
-      as1 <- atomically (drainTQueue tq)
-      as1 @?= as0)
-  (\(_, di) -> k di)
+--------------------------------------------------------------------------------
 
 drainTQueue :: TQueue a -> STM [a]
 drainTQueue tq = do
@@ -134,3 +157,8 @@ drainTQueue tq = do
 instance QC.Testable () where
   property () = QC.property True
 #endif
+
+instance QC.Arbitrary a => QC.Arbitrary (NEL.NonEmpty a) where
+  arbitrary = (NEL.:|) <$> QC.arbitrary <*> QC.arbitrary
+  shrink (a NEL.:| []) = []
+  shrink (a NEL.:| as) = fmap (a NEL.:|) (QC.shrink as)

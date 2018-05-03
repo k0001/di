@@ -66,7 +66,7 @@ renderPathColor defc pathc keyc = fix $ \f -> \case
     f p <> defc <> space <> keyc <> renderKey k <>
     defc <> equals <> renderValue v
   Push s p -> f p <> defc <> space <> pathc <> slash <> renderSegment s
-  Root s -> pathc <> slash <> renderSegment s
+  Root -> mempty
 
 -- | Like 'renderPathColor', but without color.
 renderPath :: Path -> BB.Builder
@@ -74,7 +74,7 @@ renderPath :: Path -> BB.Builder
 renderPath = fix $ \f -> \case
   Attr k v p -> f p <> space <> renderKey k <> equals <> renderValue v
   Push s p -> f p <> space <> slash <> renderSegment s
-  Root s -> slash <> renderSegment s
+  Root -> mempty
 
 renderMessage :: Message -> BB.Builder
 {-# INLINE renderMessage #-}

@@ -25,6 +25,7 @@ module Di.Gen
 
 import Control.Concurrent.STM (atomically, writeTQueue)
 import Data.String (fromString)
+import qualified Data.List.NonEmpty as NEL
 import qualified Data.Time.Clock.System as Time
 import qualified System.IO
 import qualified Test.QuickCheck as QC
@@ -50,7 +51,7 @@ genMessage = fromString <$> QC.arbitrary
 
 genPathNext :: Di.Path -> QC.Gen Di.Path
 genPathNext p0 = case p0 of
-  Di.Root _ -> QC.frequency
+  Di.Root -> QC.frequency
     [ (3, Di.Push <$> genSegment <*> pure p0)
     , (2, Di.Attr <$> genKey <*> genValue <*> pure p0) ]
   Di.Push _ p -> QC.frequency
@@ -64,7 +65,7 @@ genPathNext p0 = case p0 of
 
 -- | Infinite list.
 genPaths :: QC.Gen [Di.Path]
-genPaths = iterateM genPathNext =<< fmap Di.Root genSegment
+genPaths = iterateM genPathNext Di.Root
 
 genPath :: QC.Gen Di.Path
 genPath = (!!) <$> genPaths <*> QC.choose (0, 30)
@@ -113,5 +114,8 @@ genLogs = iterateM genLogAfter =<< genLog
 ioPrintLogs :: [Di.Log] -> IO ()
 ioPrintLogs logs = do
   let sink = Di.handleLines System.IO.stdout Di.Df1.render
-  Di.new' "unused" sink $ \di -> do
+  Di.new' sink $ \di -> do
+     -- NOTE: Don't do this at home, it's only for testing.
      mapM_ (atomically . writeTQueue (Di.diLogs di)) logs
+
+
