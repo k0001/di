@@ -1,3 +1,11 @@
+# Version 0.3
+
+* BREAKING CHANGE: `mkDiTextStderr` and `mkDiStringHandle` return a `Di String
+  [String] String` now.
+
+* Made compatible with GHC 8.4.
+
+
 # Version 0.2
 
 * BREAKING CHANGE: `Di` now takes a new type argument `level`.

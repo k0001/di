@@ -17,49 +17,66 @@ import Di.Core (Di, mkDi, contrapath)
 
 --------------------------------------------------------------------------------
 
--- | Strings separated by a forward slash. Doesn't contain white space.
+-- | Strings separated by a forward slash.
+--
+-- The string doesn't contain any of @[\'/'\, \' \', \'\\n\', \'\\r\']@.
 --
 -- Use 'fromString' (GHC's @OverloadedStrings@ extension) to construct a
 -- 'StringPath'.
-newtype StringPath = StringPath { unStringPath :: String }
+newtype StringPath = UnsafeStringPath { unStringPath :: String }
   deriving (Eq, Ord, Show)
 
 instance IsString StringPath where
   fromString = stringPathSingleton
   {-# INLINE fromString #-}
 
+-- | Ocurrences of one of @[\'/'\, \' \', \'\\n\', \'\\r\']@ in the given
+-- 'String' will be replaced by @\'_\'@.
 stringPathSingleton :: String -> StringPath
-stringPathSingleton = \s -> StringPath (map f s)
+stringPathSingleton = \s -> UnsafeStringPath (map f s)
   where f :: Char -> Char
-        f = \case '/'  -> '.'
+        f = \case '/'  -> '_'
                   ' '  -> '_'
                   '\n' -> '_'
                   '\r' -> '_'
                   c    -> c
 
 instance Semigroup StringPath where
-  StringPath "" <> b = b
-  a <> StringPath "" = a
-  StringPath a <> StringPath b = StringPath (a <> "/" <> b)
+  UnsafeStringPath "" <> b = b
+  a <> UnsafeStringPath "" = a
+  UnsafeStringPath a <> UnsafeStringPath b = UnsafeStringPath (a <> "/" <> b)
 
 instance Monoid StringPath where
-  mempty = StringPath ""
+  mempty = UnsafeStringPath ""
+  {-# INLINE mempty #-}
   mappend = (<>)
-
+  {-# INLINE mappend #-}
 -- | 'String's are written to 'IO.Handle' using the 'IO.Handle''s locale
 -- encoding.
+--
+-- The @level@ and @message@ are plain 'String's.
+--
+-- The @path@ is a list of 'String's which will be separated by @\'/\'@ when
+-- rendered. Ocurrences of one of @[\'/'\, \' \', \'\\n\', \'\\r\']@ in those
+-- 'String's will be replaced by @\'_\'@.
+--
+-- @
+-- > 'log' ('push' [\"cuatro\"] ('push' [\"uno dos\", \"tres\"] di)) \"WARNING\" \"Hello!\"
+-- WARNING 2018-05-03T09:15:54.819379740000Z uno_dos\/tres\/cuatro: Hello!
+-- @
 mkDiStringHandle
   :: (MonadIO m)
   => IO.Handle
-  -> m (Di String String String)
+  -> m (Di String [String] String)
 mkDiStringHandle h = liftIO $ do
     IO.hSetBuffering h IO.LineBuffering
-    fmap (contrapath stringPathSingleton) $ mkDi $ \ts l p m -> do
-       IO.hPutStrLn h $ mconcat
-          [ l, " ", renderIso8601 ts
-          , if p == mempty then "" else (" " <> unStringPath p)
-          , ": ", noBreaks m ]
-       IO.hFlush h
+    fmap (contrapath (mconcat . map stringPathSingleton)) $ do
+       mkDi $ \ts l p m -> do
+          IO.hPutStrLn h $ mconcat
+             [ l, " ", renderIso8601 ts
+             , if p == mempty then "" else (" " <> unStringPath p)
+             , ": ", noBreaks m ]
+          IO.hFlush h
   where
     noBreaks :: String -> String
     noBreaks = concatMap $ \case
@@ -67,8 +84,11 @@ mkDiStringHandle h = liftIO $ do
       '\r' -> "\\r"
       c -> [c]
 
--- | 'String' is written to 'IO.stderr' using the system's locale encoding.
-mkDiStringStderr :: MonadIO m => m (Di String String String)
+-- |
+-- @
+-- 'mkDiStringStderr'  ==  'mkDiStringHandle' 'IO.stderr'
+-- @
+mkDiStringStderr :: MonadIO m => m (Di String [String] String)
 mkDiStringStderr = mkDiStringHandle IO.stderr
 
 --------------------------------------------------------------------------------

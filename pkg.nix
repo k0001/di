@@ -3,13 +3,13 @@
 }:
 mkDerivation {
   pname = "di";
-  version = "0.1";
+  version = "0.3";
   src = ./.;
   libraryHaskellDepends = [ base stm time transformers ];
   testHaskellDepends = [
     base bytestring QuickCheck stm tasty tasty-hunit tasty-quickcheck
   ];
   homepage = "https://github.com/k0001/di";
-  description = "Easy and powerful typeful logging without monad towers";
+  description = "Easy, powerful, structured and typeful logging without monad towers";
   license = stdenv.lib.licenses.bsd3;
 }
