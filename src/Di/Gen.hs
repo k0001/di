@@ -112,9 +112,8 @@ genLogs = iterateM genLogAfter =<< genLog
 
 ioPrintLogs :: [Di.Log] -> IO ()
 ioPrintLogs logs = do
-  let sink = Di.handleLines System.IO.stdout Di.Df1.render
+  let sink = Di.handleLines True System.IO.stdout Di.Df1.render
   Di.new' sink $ \di -> do
      -- NOTE: Don't do this at home, it's only for testing.
      mapM_ (atomically . writeTQueue (Di.diLogs di)) logs
-
 

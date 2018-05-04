@@ -80,12 +80,14 @@ module Di
 import Prelude hiding (error, max, log)
 
 import Control.Applicative (Alternative)
+import qualified Control.Exception as Ex
+  (AsyncException, asyncExceptionFromException, BlockedIndefinitelyOnSTM)
 import Control.Concurrent (forkFinally)
 import Control.Concurrent.STM
   (STM, atomically, check,
    TQueue, newTQueueIO, readTQueue, writeTQueue, peekTQueue, isEmptyTQueue)
-import qualified Control.Exception as Ex
 import Control.Monad (join)
+import qualified Control.Monad.Catch as Ex
 import Control.Monad.Cont (MonadCont, ContT(ContT))
 import Control.Monad.Error (MonadError, ErrorT(ErrorT), Error)
 import Control.Monad.Except (ExceptT(ExceptT))
@@ -113,14 +115,14 @@ import qualified Data.ByteString as B
 import Data.String (fromString)
 import Data.Function (fix)
 import qualified Data.Time.Clock.System as Time
-import Lens.Family2 (view)
 import qualified Pipes.ByteString as Pb
 import qualified Pipes as P
 import qualified Pipes.Internal as P
 import qualified System.Exit
 
 import qualified Di.Df1
-import Di.Misc (mute, muteSync, catchSync, getSystemTimeSTM, drainProducer)
+import Di.Misc
+  (mute, muteSync, catchSync, getSystemTimeSTM, drainProducer, splitterBytes, line)
 import Di.Sink
   (Sink(Sink), withSink, stderrLines, handleLines, sinkFallback, withSink)
 import Di.Types
@@ -137,9 +139,6 @@ import Di.Types
    LogBlobRenderer(LogBlobRenderer))
 
 {-
-TODO Specify lazy semantics for Log fields. E.g., logging a message containing
-`undefined` should be caught gracefuly inside di.
-
 TODO Export the df1 rendererer from the Di module.
 
 TODO Tests for lazy semantics.
@@ -149,10 +148,6 @@ TODO Mask/restore for filtering? Consider how practical this would be.
 TODO Query language.
 
 TODO Test STM semantics (e.g, STM.retry and `runDiT' id`)
-
-TODO Consider DF1 (time, level, path, ...) order rather than (time, path,
-level...)? Consider the UX with and without colors, and command-line tooling
-support aspects.
 
 TODO Switch for forcing colors off in handleLines.
 
@@ -230,37 +225,37 @@ TODO Rename MonadDi to MonadLog, DiT to LogT, Log to Request?
 -- library needs to obtain a concrete 'Di', for example, to call 'runDiT' from
 -- a different thread, then it could get that 'Di' using @'Di.ask' :: 'MonadDi'
 -- m => m 'Di'@, or simply receive as an argument.
-new :: (Di -> IO a) -> IO a
+new :: (MonadIO m, Ex.MonadMask m) => (Di -> m a) -> m a
 new = new' (stderrLines Di.Df1.render)
 
-new' :: Sink -> (Di -> IO a) -> IO a
+new' :: (MonadIO m, Ex.MonadMask m) => Sink -> (Di -> m a) -> m a
 new' sink act =
   withSink sink $ \write -> do
-    tqLogs :: TQueue Log <- newTQueueIO
+    tqLogs :: TQueue Log <- liftIO newTQueueIO
     -- Start worker thread, restarting in in case of sync exceptions (unlikely).
-    _ <- fix $ \k -> forkFinally (worker write tqLogs) $ \case
+    _ <- liftIO $ fix $ \k -> forkFinally (worker write tqLogs) $ \case
        Right () -> pure () -- All messages processed and nobody cares anymore.
        Left se -> case Ex.asyncExceptionFromException se of
-          Just (_ :: Ex.AsyncException) -> Ex.throwIO se
+          Just (_ :: Ex.AsyncException) -> Ex.throwM se
           Nothing -> k >> pure ()
     let di = Di Debug Root tqLogs
     -- Run 'act', silently flushing and logging any unhandled synchronous
     -- exceptions afterwards.
-    flip Ex.finally (mute (atomically (flushDi di))) $
+    flip Ex.finally (mute (liftIO (atomically (flushDi di)))) $
       catchSync (act di) $ \se -> do
          case Ex.fromException se of
             Just (_ :: System.Exit.ExitCode) -> do
                pure () -- 'act' requested an exit, we'll exit as requested.
             Nothing -> do
-               syst <- Ex.onException (Time.getSystemTime) (Ex.throw se)
+               syst <- Ex.onException (liftIO Time.getSystemTime) (Ex.throwM se)
                -- We mute because it doesn't really matter if this fails.
-               mute $ atomically $ writeTQueue tqLogs $ Log
+               mute $ liftIO $ atomically $ writeTQueue tqLogs $ Log
                  { logTime = syst, logLevel = Alert
                  , logPath = Attr "exception"
                      (fromString (Ex.displayException se)) (diPath di)
                  , logMessage = "Unhandled exception. \
                                 \Logging system will stop now." }
-         Ex.throw se
+         Ex.throwM se
   where
     worker :: (Log -> IO ()) -> TQueue Log -> IO ()
     worker write tqLogs = fix $ \k -> do
@@ -269,6 +264,7 @@ new' sink act =
       -- the log message and remove it from 'tqLogs' afterwards. This is why
       -- 'flush' works by just checking if 'tqLogs' is empty.
       eio <- Ex.try $ atomically $ do
+         -- Don't force log' yet so that pure exceptions from happening here.
          log' :: Log <- peekTQueue tqLogs
          pure (Ex.finally (write log')
                           (atomically (readTQueue tqLogs)))
@@ -303,8 +299,9 @@ flushDi di = check =<< isEmptyTQueue (diLogs di)
 -- /Note regarding exceptions:/ As witnessed by the 'MonadDi' context, the only
 -- exceptions that could ever be thrown by this function are those that
 -- 'natSTM' could. Synchronous exceptions that happen due to failures in the
--- actual priting of the log message are handled in a different by attempting to
--- log the message to 'IO.stderr' as a fallback. Asynchronous exceptions that
+-- actual priting of the log message or are thrown from pure code (e.g., using
+-- 'undefined' as one of the arguments) are handled in a different by attempting
+-- to log the message to 'IO.stderr' as a fallback. Asynchronous exceptions that
 -- might there, as expected, are not explicitly handled. In practical terms,
 -- this means that unless you know what you are doing, /you should
 -- just call 'log' without worrying about it ever throwing exceptions/.
@@ -312,7 +309,8 @@ log :: MonadDi m => Level -> Message -> m ()
 log l = \m -> ask >>= \di ->
    when (l >= diMax di) $ do
       !syst <- natSTM getSystemTimeSTM
-      let !x = Log syst l (diPath di) m
+      -- Don't force log' yet so that pure exceptions from happening here.
+      let x = Log syst l (diPath di) m
       natSTM $ writeTQueue (diLogs di) x
 {-# INLINABLE log #-}
 
@@ -492,10 +490,6 @@ newtype DiT m a = DiT (ReaderT (Di, H STM m) m a)
      MonadFail, MonadFix, MonadZip, MonadPlus, MonadCont,
      MonadError e, MonadState s, MonadWriter w)
 
-instance MonadTrans DiT where
-  lift = \x -> DiT (lift x)
-  {-# INLINE lift #-}
-
 -- | Like 'runDiT'', but specialized to run with an underlying 'MonadIO'.
 --
 -- @
@@ -572,11 +566,36 @@ hoistDiT
 hoistDiT hgf hfg = \(DiT (ReaderT f)) ->
    DiT (ReaderT (\(di, H hstmg) -> hfg (f (di, H (\stm -> hgf (hstmg stm))))))
 
+instance MonadTrans DiT where
+  lift = \x -> DiT (lift x)
+  {-# INLINE lift #-}
+
+instance Ex.MonadThrow m => Ex.MonadThrow (DiT m) where
+  throwM = \x -> lift (Ex.throwM x)
+  {-# INLINE throwM #-}
+
+instance Ex.MonadCatch m => Ex.MonadCatch (DiT m) where
+  catch (DiT (ReaderT f)) = \g -> DiT (ReaderT (\x ->
+    Ex.catch (f x) (\e -> let DiT (ReaderT h) = g e in h x)))
+  {-# INLINE catch #-}
+
+instance forall m. Ex.MonadMask m => Ex.MonadMask (DiT m) where
+  mask f = DiT (ReaderT (\x ->
+    Ex.mask (\u ->
+      case f (\(DiT (ReaderT g)) -> DiT (ReaderT (u . g))) of
+         DiT (ReaderT h) -> h x)))
+  {-# INLINE mask #-}
+  uninterruptibleMask f = DiT (ReaderT (\x ->
+    Ex.uninterruptibleMask (\u ->
+      case f (\(DiT (ReaderT g)) -> DiT (ReaderT (u . g))) of
+        DiT (ReaderT h) -> h x)))
+  {-# INLINE uninterruptibleMask #-}
+
 instance MonadReader r m => MonadReader r (DiT m) where
   ask = DiT (ReaderT (\_ -> Reader.ask))
   {-# INLINE ask #-}
   local f = \(DiT (ReaderT gma)) ->
-     DiT (ReaderT (\di -> Reader.local f (gma di)))
+     DiT (ReaderT (\x -> Reader.local f (gma x)))
   {-# INLINE local #-}
 
 instance Monad m => MonadDi (DiT m) where
@@ -665,8 +684,7 @@ runLogLineParser
   -> P.Producer (Either String Log) m a
   -- If it's possible to par
 runLogLineParser (LogLineParserUtf8 parser0) = \pb0 -> do
-    let pb1 = pb0 P.>-> Pb.filter (/= 13)  -- We discard '\r' from input.
-    iterTM fline (view (Pb.splits 10) pb1) -- We split on '\n' and parse.
+    iterTM fline (splitterBytes line pb0) -- We split on CR, LF, and CRLF.
   where
     -- The outer producer produces a line of input, in chunks.
     fline :: P.Producer B.ByteString m (P.Producer (Either String Log) m a)

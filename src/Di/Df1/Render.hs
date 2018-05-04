@@ -311,9 +311,9 @@ removeAnsiEscapes b0 = do
           (ABL.satisfy (== 27) $> "")
     pAnsiEscape :: ABL.Parser ()
     pAnsiEscape = (ABL.<?> "pAnsiEscape") $ do
-      ABL.satisfy (== 27)  -- '\ESC'
-      ABL.satisfy (== 91)  -- '['
-      ABL.takeWhile (\w -> w == 59 || (w >= 48 && w <= 57)) -- ';' '0'-'9'
-      ABL.satisfy (== 109) -- 'm'
+      _ <- ABL.satisfy (== 27)  -- '\ESC'
+      _ <- ABL.satisfy (== 91)  -- '['
+      _ <- ABL.takeWhile (\w -> w == 59 || (w >= 48 && w <= 57)) -- ';' '0'-'9'
+      _ <- ABL.satisfy (== 109) -- 'm'
       pure ()
 

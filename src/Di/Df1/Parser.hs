@@ -2,11 +2,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Di.Df1.Parser
- {- ( parseLog
- ) -} where
+ ( parseLog
+ ) where
 
 import Control.Applicative ((<|>), many, empty)
-import Control.Monad (void)
 import Data.Bits (shiftL)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
@@ -33,12 +32,10 @@ parseLog = (AB.<?> "parseLog") $ do
   p <- AB.skipWhile (== 32) *> pPath
   l <- AB.skipWhile (== 32) *> pLevel
   m <- AB.skipWhile (== 32) *> pMessage
-  -- Make sure we reached the end or a newline.
-  -- void AB.atEnd <|> void (AB.word8 10) <|> void (AB.word8 13 >> AB.word8 10)
   pure (Log (Time.utcToSystemTime t) l p m)
 
 pIso8601 :: AB.Parser Time.UTCTime
-{-# INLINE pIso8601 #-}
+{-# INLINABLE pIso8601 #-}
 pIso8601 = (AB.<?> "pIso8601") $ do
   year <- (pNum4Digits AB.<?> "year") <* (AB.skip (== 45) AB.<?> "-")
   month <- (pNum2Digits AB.<?> "month") <* (AB.skip (== 45) AB.<?> "-")
@@ -101,7 +98,7 @@ pLevel = (AB.<?> "pLevel")
   (AB.string "EMERGENCY" $> Di.Emergency)
 
 pPath :: AB.Parser Di.Path
-{-# INLINE pPath #-}
+{-# INLINABLE pPath #-}
 pPath = (AB.<?> "pPath") $ do
     fix (\k path -> ((pPush path <|> pAttr path) >>= k) <|> pure path) Root
   where
@@ -113,9 +110,9 @@ pPath = (AB.<?> "pPath") $ do
     {-# INLINE pAttr #-}
     pAttr :: Di.Path -> AB.Parser Di.Path
     pAttr path = do
-      key <- pKey <* AB.skip (== 61)
-      value <- pValue <* AB.skipWhile (== 32)
-      pure (Di.Attr key value path)
+      k <- pKey <* AB.skip (== 61)
+      v <- pValue <* AB.skipWhile (== 32)
+      pure (Di.Attr k v path)
 
 pSegment :: AB.Parser Di.Segment
 pSegment = (AB.<?> "pSegment") $ do
@@ -174,7 +171,7 @@ pDecodePercents = pDecodePercentsL . BL.fromStrict
 --
 -- TODO: Make faster and more space efficient.
 pDecodePercentsL :: BL.ByteString -> AB.Parser BL.ByteString
-{-# INLINE pDecodePercentsL #-}
+{-# INLINABLE pDecodePercentsL #-}
 pDecodePercentsL = \bl ->
     either fail pure (ABL.eitherResult (ABL.parse p bl))
   where
@@ -188,25 +185,4 @@ pDecodePercentsL = \bl ->
                 Just _  -> AB.takeWhile1 (\w -> w /= 37)
              bls <- many k <* AB.endOfInput
              pure (mconcat (BL.fromStrict b : bls))
-
--- | Remove ANSI escapes. This is not complete, but it covers the ANSI codes we
--- use.
-removeAnsiEscapes :: B.ByteString -> B.ByteString
-removeAnsiEscapes b0 = do
-    case AB.parseOnly p b0 of
-       Right b1 -> b1
-       Left e -> error ("removeAnsiEscapes: unexpected " ++ e)
-  where
-    p :: AB.Parser B.ByteString
-    p = fmap B.concat $ many $
-          (AB.takeWhile1 (/= 27)) <|>
-          (pAnsiEscape $> "") <|>
-          (AB.satisfy (== 27) $> "")
-    pAnsiEscape :: AB.Parser ()
-    pAnsiEscape = (AB.<?> "pAnsiEscape") $ do
-      AB.satisfy (== 27) AB.<?> "a" -- '\ESC'
-      AB.satisfy (== 91) AB.<?> "b" -- '['
-      AB.takeWhile (\w -> w == 59 || (w >= 48 && w <= 57)) -- ';' '0'-'9'
-      AB.satisfy (== 109) AB.<?> "d" -- 'm'
-      pure ()
 

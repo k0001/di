@@ -14,11 +14,12 @@ module Di.Sink
 
 import Control.Concurrent (MVar, newMVar, modifyMVar, modifyMVar_)
 import qualified Control.Exception as Ex
+import Control.Monad.IO.Class (MonadIO(liftIO))
+import qualified Control.Monad.Catch as Cx
 import qualified Data.ByteString.Builder as BB
 import qualified Data.List as List
 import Data.Monoid ((<>))
 import Data.String (fromString)
-import qualified Data.Text.Lazy as TL
 import qualified Data.Time.Clock.System as Time
 import qualified System.IO as IO
 import System.IO.Unsafe (unsafePerformIO)
@@ -69,15 +70,32 @@ sinkFallback (Sink md) (Sink mf) = Sink $ do
 
 --------------------------------------------------------------------------------
 
-newtype Sink = Sink { unSink :: IO (IO (), (Log -> IO ())) }
+-- | A 'Sink' describes how to commit a 'Log' to the outside world.
+--
+-- If you need to use a 'Sink', use 'withSink'.
+newtype Sink = Sink
+  { unSink :: IO (IO (), (Log -> IO ()))
+    -- ^ The outer 'IO' action initializes the 'Sink' somehow.  If it can be
+    -- initialized for some reason, then this outer 'IO' action should throw
+    -- an exception.
+    --
+    -- The returned 'IO' action closes or releases any resources the outer 'IO'
+    -- action might have acquired.
+    --
+    -- The returned @'Log' -> 'IO' ()@ action commits the given 'Log' to the
+    -- real world (e.g., it writes it to a file, or sends it over the network).
+  }
 
--- | Obtain a “'Log' writing” function from a 'Sink'.
+-- | Obtain a 'Log' writing function from a 'Sink'.
 --
 -- Any resources acquired during 'Sink' initialization are released afterwards.
 --
--- The @'Log' -> 'IO' ()@ could throw exceptions.
-withSink :: Sink -> ((Log -> IO ()) -> IO a) -> IO a
-withSink (Sink acq) k = Ex.bracket acq fst (k . snd)
+-- The @'Log' -> 'n' ()@ function could throw exceptions.
+withSink
+  :: (MonadIO n, MonadIO m, Cx.MonadMask m)
+  => Sink -> ((Log -> n ()) -> m a) -> m a
+withSink (Sink acq) act =
+  Cx.bracket (liftIO acq) (liftIO . fst) (act . fmap liftIO . snd)
 
 --------------------------------------------------------------------------------
 
@@ -94,15 +112,17 @@ instance Ex.Exception HandleBusy
 -- | Like 'handleBlob', but each 'Log' is rendered as text in its own line.
 --
 -- If the given 'IO.Handle' is associated to a TTY supporting ANSI colors, and
--- the given 'LogLineRenderer' supports rendering with colors, then you will get
--- colorful output.
+-- the given 'LogLineRenderer' supports rendering with colors, and you ask for
+-- it, then you will get colorful output.
 handleLines
-  :: IO.Handle -- ^ Handle where to write 'Log's.
+  :: Bool      -- ^ Whether to render with colors if possible.
+  -> IO.Handle -- ^ Handle where to write 'Log's.
   -> LogLineRenderer -- ^ How to render each 'Log'.
   -> Sink
-handleLines h (LogLineRendererUtf8 render0) = Sink $ do
-  !render1 <- render0 <$> isTty h
-  let !newline = BB.char7 '\n'
+handleLines wantColors h (LogLineRendererUtf8 render0) = Sink $ do
+  isTty_ <- isTty h
+  let !render1 = render0 (wantColors && isTty_)
+      !newline = BB.char7 '\n'
       render2 = \log' -> render1 log' <> newline
   unSink (handleBlob h (LogBlobRenderer render2))
 
@@ -128,7 +148,7 @@ handleBlob h (LogBlobRenderer render) = Sink $ do
 stderrLines
   :: LogLineRenderer -- ^ How to render each 'Log' line.
   -> Sink
-stderrLines = handleLines IO.stderr
+stderrLines = handleLines True IO.stderr
 
 --------------------------------------------------------------------------------
 

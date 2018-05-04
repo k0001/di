@@ -1,9 +1,13 @@
+{-# LANGUAGE ApplicativeDo #-}
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Main where
 
+import Control.Monad.Catch as Ex
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Monad.Trans.Class (lift)
 import Data.Monoid ((<>))
@@ -12,31 +16,35 @@ import qualified Options.Applicative as OA
 import qualified Test.QuickCheck as QC
 import qualified Pipes as P
 import qualified Pipes.ByteString as Pb
+import qualified System.IO as IO
 
 import qualified Di
 import qualified Di.Df1
--- import qualified Di.Gen
+import qualified Di.Gen
 
 --------------------------------------------------------------------------------
 
 main :: IO ()
 main = Di.new $ flip Di.runDiT $ do
    co <- lift getCmdOpts
-   case cmdOpts_subCmdOpts co of
-      SubCmdQuery -> main_select
+   case cmdOpts_subCmd co of
+      SubCmdQuery x -> main_query x
       SubCmdFake -> main_fake
-      SubCmdExample -> main_example
 
 --------------------------------------------------------------------------------
 
 data CmdOpts = CmdOpts
-  { cmdOpts_subCmdOpts :: !SubCmdOpts
+  { cmdOpts_subCmd :: !SubCmd
   }
 
-data SubCmdOpts
-  = SubCmdQuery
+data SubCmd
+  = SubCmdQuery !SubCmdQueryOpts
   | SubCmdFake
-  | SubCmdExample
+
+data SubCmdQueryOpts = SubCmdQueryOpts
+  { subCmdQueryOpts_input :: !(Maybe IO.FilePath)
+  , subCmdQueryOpts_output :: !(Maybe IO.FilePath)
+  }
 
 ---
 
@@ -45,74 +53,77 @@ getCmdOpts = OA.execParser $ OA.info (OA.helper <*> pCmdOpts) $ mconcat
   [ OA.fullDesc, OA.progDesc "df1 command-line tool" ]
 
 pCmdOpts :: OA.Parser CmdOpts
-pCmdOpts = CmdOpts <$> (OA.helper <*> pSubCmdOpts)
+pCmdOpts = CmdOpts <$> (OA.helper <*> pSubCmd)
 
-pSubCmdOpts :: OA.Parser SubCmdOpts
-pSubCmdOpts = OA.subparser $ mconcat
-  [ OA.command "select" $ OA.info
-      (OA.helper <*> pure SubCmdQuery)
+pSubCmd :: OA.Parser SubCmd
+pSubCmd = OA.subparser $ mconcat
+  [ OA.command "query" $ OA.info
+      (OA.helper <*> fmap SubCmdQuery pSubCmdQueryOpts)
       (OA.fullDesc <>
-       OA.progDesc "Select logs that match the given select")
+       OA.progDesc "Select logs that match the given query")
   , OA.command "fake" $ OA.info
       (OA.helper <*> pure SubCmdFake)
       (OA.fullDesc <>
        OA.progDesc "Generate fake logs")
-  , OA.command "example" $ OA.info
-      (OA.helper <*> pure SubCmdExample)
-      (OA.fullDesc <>
-       OA.progDesc "Generate example logs")
   ]
+
+pSubCmdQueryOpts :: OA.Parser SubCmdQueryOpts
+pSubCmdQueryOpts = do
+  subCmdQueryOpts_input <- OA.option (fmap Just OA.str) $ mconcat
+    [ OA.long "input"
+    , OA.metavar "FILENAME"
+    , OA.value Nothing
+    , OA.help "File to use as input. If unspecified, defaults to STDIN." ]
+  subCmdQueryOpts_output <- OA.option (fmap Just OA.str) $ mconcat
+    [ OA.long "output"
+    , OA.metavar "FILENAME"
+    , OA.value Nothing
+    , OA.help "File to use as output. If unspecified, defaults to STDOUT." ]
+  pure (SubCmdQueryOpts {..})
+
 
 --------------------------------------------------------------------------------
 
 main_fake :: (Di.MonadDi m, MonadIO m) => m ()
 main_fake = Di.push "fake" $ do
-   pure ()
-   -- liftIO $ sample 1000
+   liftIO $ sample 1000
 
--- sample :: Int -> IO ()
--- sample n = Di.Gen.ioPrintLogs =<< QC.generate (fmap (take n) Di.Gen.genLogs)
---
---------------------------------------------------------------------------------
-
-main_select :: forall m. (Di.MonadDi m, MonadIO m) => m ()
-main_select = Di.push "select" $ do
-   P.runEffect $ do
-     P.for (Di.runLogLineParser Di.Df1.parse Pb.stdin) $ \case
-        Right log' -> liftIO (print (show log'))
-        Left e -> Di.push "parser" $ Di.warning (fromString e)
-
+sample :: Int -> IO ()
+sample n = Di.Gen.ioPrintLogs =<< QC.generate (fmap (take n) Di.Gen.genLogs)
 
 --------------------------------------------------------------------------------
 
-main_example :: forall m. (Di.MonadDi m, MonadIO m) => m ()
-main_example = Di.push "example" $ Di.attr "version" "123.35" $ do
-   Di.notice "Hello, welcome to the example project"
-   Di.info "Let's initialize some stuff now"
-   yport <- initStuff
-   case yport of
-      Nothing -> do
-         Di.critical "Couldn't initialize. Can't do anything useful. Bye"
-      Just port -> do
-         Di.push "server" $ do
-            Di.attr "port" (fromString (show port)) $ do
-               Di.notice "All set. Listening for incoming connections."
-               handler "yahoo.com" -- just pretending yahoo hits us
-         Di.notice "Program finished successfully, we'll exit now."
- where
-   initStuff :: m (Maybe Int)
-   initStuff = Di.push "init" $ do
-      Di.push "frobizer" $ do
-        Di.attr "remote-addr" "google.com" $ do
-           Di.notice "Connecting to remote frobizer"
-           Di.attr "error" "division by 7" $ do
-              Di.error "Could not connect."
-           Di.warning "Using fallback in memory frobizer"
-      Di.push "wat" $ do
-        Di.info "The wat has been setup"
-        return (Just 1234)
-   handler :: String -> m ()
-   handler remoteEnd = Di.push "handler" $ do
-      Di.attr "remote-end" (fromString remoteEnd) $ do
-         Di.notice "Incoming connection"
-         Di.warning "Remote host is trying to hack us!"
+main_query
+  :: forall m
+  .  (Di.MonadDi m, MonadIO m, Ex.MonadMask m)
+  => SubCmdQueryOpts
+  -> m ()
+main_query opts = Di.push "query" $ do
+  withInput (subCmdQueryOpts_input opts) $ \hin ->
+     withOutput (subCmdQueryOpts_output opts) $ \hout -> do
+        Di.withSink (Di.handleLines True hout Di.Df1.render) $ \write -> do
+           let p0 = Di.runLogLineParser Di.Df1.parse (Pb.fromHandle hin)
+           P.runEffect $ P.for p0 $ \case
+              Right !log' -> liftIO (write log')
+              Left e -> Di.push "parser" $ Di.warning (fromString e)
+
+--------------------------------------------------------------------------------
+
+withInput
+  :: (MonadIO n, Ex.MonadMask n)
+  => Maybe FilePath
+  -> (IO.Handle -> n a)
+  -> n a
+withInput Nothing act = act IO.stdin
+withInput (Just fn) act = Ex.bracket
+  (liftIO (IO.openBinaryFile fn IO.ReadMode)) (liftIO . IO.hClose) act
+
+withOutput
+  :: (MonadIO n, Ex.MonadMask n)
+  => Maybe FilePath
+  -> (IO.Handle -> n a)
+  -> n a
+withOutput Nothing act = act IO.stdout
+withOutput (Just fn) act = Ex.bracket
+  (liftIO (IO.openBinaryFile fn IO.AppendMode)) (liftIO . IO.hClose) act
+
