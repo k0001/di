@@ -15,7 +15,7 @@ homepage: https://github.com/k0001/di
 bug-reports: https://github.com/k0001/di/issues
 
 library
-  hs-source-dirs: src
+  hs-source-dirs: lib
   default-language: Haskell2010
   exposed-modules: Di
   other-modules: Di.Core Di.Backend
