@@ -10,7 +10,7 @@ module Df1.Types
  , Message, unMessage, message
  ) where
 
-import Data.Semigroup (Semigroup)
+import Data.Semigroup (Semigroup((<>)))
 import Data.Sequence as Seq
 import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
