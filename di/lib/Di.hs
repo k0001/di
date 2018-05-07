@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
--- | This module is a highly opinionated, basic, and yet surprisingly sufficient
+-- | This module is a highly opinionated, basic, and yet sufficient
 -- choice of a concrete stack of logging solutions belonging to the [di
 -- logging ecosystem](https://github.com/k0001/di)—an otherwise rather
 -- general ecosystem, flexible and full of choices.
