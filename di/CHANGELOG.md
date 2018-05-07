@@ -1,3 +1,11 @@
+# Version 1.0.1
+
+* COMPILER ASSISTED BREAKING CHANGE: We don't export `DiT` anymore.
+
+* Re-export `Df1.Path`.
+
+
+
 # Version 1.0
 
 * BREAKING CHANGE: Most of what used to be in this library lives now in
