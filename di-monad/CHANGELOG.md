@@ -1,6 +1,6 @@
 # Version 1.0.2
 
-* Backwards compatibility with `mtl < 0.2.2`.
+* Backwards compatibility with `mtl < 2.2.2`.
 
 # Version 1.0.1
 
