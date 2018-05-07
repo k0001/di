@@ -2,7 +2,7 @@
 
 * COMPILER ASSISTED BREAKING CHANGE: We don't export `DiT` anymore.
 
-* Re-export `Df1.Path`.
+* Re-export `Df1.Path`, `Df1.Level`.
 
 
 

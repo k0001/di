@@ -77,6 +77,7 @@ module Di
  , Df1.value
 
    -- ** Messages
+ , Df1.Level
  , Df1.Message
  , Di.Df1.Monad.debug
  , Di.Df1.Monad.info
