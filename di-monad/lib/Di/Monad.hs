@@ -63,7 +63,6 @@ import Control.Monad.Catch as Ex
 import Control.Monad.Cont (MonadCont, ContT(ContT))
 import Control.Monad.Except (ExceptT(ExceptT))
 import Control.Monad.Fail (MonadFail)
-import Control.Monad.Identity (IdentityT(IdentityT))
 import Control.Monad.Fix (MonadFix)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad (MonadPlus)
@@ -75,6 +74,7 @@ import Control.Monad.State (MonadState)
 import qualified Control.Monad.State.Lazy as SL
 import qualified Control.Monad.State.Strict as SS
 import Control.Monad.Trans.Class (MonadTrans, lift)
+import Control.Monad.Trans.Identity (IdentityT(IdentityT))
 import Control.Monad.Trans.Maybe (MaybeT(MaybeT))
 import Control.Monad.Writer (MonadWriter)
 import qualified Control.Monad.Writer.Lazy as WL

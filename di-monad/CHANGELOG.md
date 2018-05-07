@@ -1,3 +1,7 @@
+# Version 1.0.2
+
+* Backwards compatibility with `mtl < 0.2.2`.
+
 # Version 1.0.1
 
 * Backwards compatibility with `transformers < 0.5.3`.
