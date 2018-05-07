@@ -65,7 +65,7 @@ module Di
 
    -- ** Hierarchy
  , Di.Df1.Monad.push
- , Di.Path
+ , Df1.Path
  , Df1.Segment
  , Df1.segment
 
