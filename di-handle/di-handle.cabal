@@ -1,4 +1,4 @@
-name: di
+name: di-handle
 version: 1.0
 author: Renzo Carbonara
 maintainer: renλren.zone
@@ -9,29 +9,22 @@ extra-source-files: README.md CHANGELOG.md
 category: Logging
 build-type: Simple
 cabal-version: >=1.18
-synopsis: Typeful hierarchical structured logging using di, mtl and df1.
-description:
-  Typeful hierarchical structured logging using di, mtl and df1.
-  .
-  This is meta-package bringing in together things from the @di-core@,
-  @di-monad@, @di-handle@ and @di-df1@ libraries.
-  .
-  See the "Di" module for more documentation.
+synopsis: IO support for file handles in di-core
+description: IO support for file handles in di-core
 homepage: https://github.com/k0001/di
 bug-reports: https://github.com/k0001/di/issues
 
 library
   hs-source-dirs: lib
   default-language: Haskell2010
-  exposed-modules: Di
+  exposed-modules: Di.Handle
   build-depends:
     base >=4.9 && <5.0,
-    df1,
-    di-core,
-    di-df1,
-    di-handle,
-    di-monad,
-    exceptions
+    bytestring,
+    exceptions,
+    di-core
   ghcjs-options: -Wall -O3
   ghc-options: -Wall -O2
+  if !os(windows)
+     build-depends: unix
 

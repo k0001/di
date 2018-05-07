@@ -1,15 +1,14 @@
-{ mkDerivation, base, bytestring, QuickCheck, stdenv, stm, tasty
-, tasty-hunit, tasty-quickcheck, time, transformers
+{ mkDerivation, base, df1, di-core, di-df1, di-handle, di-monad
+, exceptions, stdenv
 }:
 mkDerivation {
   pname = "di";
-  version = "0.3";
+  version = "1.0";
   src = ./.;
-  libraryHaskellDepends = [ base stm time transformers ];
-  testHaskellDepends = [
-    base bytestring QuickCheck stm tasty tasty-hunit tasty-quickcheck
+  libraryHaskellDepends = [
+    base df1 di-core di-df1 di-handle di-monad exceptions
   ];
   homepage = "https://github.com/k0001/di";
-  description = "Easy, powerful, structured and typeful logging without monad towers";
+  description = "Typeful hierarchical structured logging using di, mtl and df1";
   license = stdenv.lib.licenses.bsd3;
 }

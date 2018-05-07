@@ -1,3 +1,3 @@
 language: nix
-script: nix build -f ./release.nix --argstr nixpkgs /nix/var/nix/profiles/per-user/root/channels/nixpkgs di
+script: nix build -f ./release.nix --argstr nixpkgs /nix/var/nix/profiles/per-user/root/channels/nixpkgs
 

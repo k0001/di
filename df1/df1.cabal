@@ -1,0 +1,48 @@
+name: df1
+version: 0.1
+author: Renzo Carbonara
+maintainer: renλren.zone
+copyright: Renzo Carbonara 2018
+license: BSD3
+license-file: LICENSE.txt
+extra-source-files: README.md CHANGELOG.md
+category: Logging
+build-type: Simple
+cabal-version: >=1.18
+synopsis: Type, render and parse the df1 hierarchical structured log format
+description:
+  Type, render and parse logs in /df1/ format, a hierarchical structured
+  log format that is easy for humans and fast for computers.
+homepage: https://github.com/k0001/di
+bug-reports: https://github.com/k0001/di/issues
+
+library
+  hs-source-dirs: lib
+  default-language: Haskell2010
+  exposed-modules: Df1
+  other-modules: Df1.Render Df1.Parse Df1.Types
+  build-depends:
+    attoparsec,
+    base >=4.9 && <5.0,
+    bytestring,
+    containers,
+    text,
+    time
+  ghcjs-options: -Wall -O3
+  ghc-options: -Wall -O2
+
+test-suite test
+  default-language: Haskell2010
+  type: exitcode-stdio-1.0
+  hs-source-dirs: test
+  main-is: Main.hs
+  build-depends:
+    attoparsec,
+    base,
+    bytestring,
+    df1,
+    QuickCheck,
+    text,
+    time,
+    tasty,
+    tasty-quickcheck

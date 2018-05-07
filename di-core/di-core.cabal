@@ -1,0 +1,44 @@
+name: di-core
+version: 1.0
+author: Renzo Carbonara
+maintainer: renλren.zone
+copyright: Renzo Carbonara 2017-2018
+license: BSD3
+license-file: LICENSE.txt
+extra-source-files: README.md CHANGELOG.md
+category: Logging
+build-type: Simple
+cabal-version: >=1.18
+synopsis: Typeful hierarchical structured logging without monad towers.
+description: Typeful hierarchical structured logging without monad towers.
+homepage: https://github.com/k0001/di
+bug-reports: https://github.com/k0001/di/issues
+
+library
+  hs-source-dirs: lib
+  default-language: Haskell2010
+  exposed-modules: Di.Core
+  build-depends:
+    base >=4.9 && <5.0,
+    containers,
+    exceptions,
+    stm,
+    time
+  ghcjs-options: -Wall -O3
+  ghc-options: -Wall -O2
+
+test-suite test
+  default-language: Haskell2010
+  type: exitcode-stdio-1.0
+  hs-source-dirs: test
+  main-is: Main.hs
+  build-depends:
+    base,
+    exceptions,
+    di-core,
+    QuickCheck,
+    stm,
+    time,
+    tasty,
+    tasty-hunit,
+    tasty-quickcheck

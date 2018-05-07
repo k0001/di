@@ -8,5 +8,5 @@ let
   };
 
 in {
-  inherit (ghc841) di;
+  inherit (ghc841) df1 di di-core di-df1 di-handle di-monad;
 }

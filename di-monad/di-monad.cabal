@@ -1,4 +1,4 @@
-name: di
+name: di-monad
 version: 1.0
 author: Renzo Carbonara
 maintainer: renλren.zone
@@ -9,29 +9,24 @@ extra-source-files: README.md CHANGELOG.md
 category: Logging
 build-type: Simple
 cabal-version: >=1.18
-synopsis: Typeful hierarchical structured logging using di, mtl and df1.
-description:
-  Typeful hierarchical structured logging using di, mtl and df1.
-  .
-  This is meta-package bringing in together things from the @di-core@,
-  @di-monad@, @di-handle@ and @di-df1@ libraries.
-  .
-  See the "Di" module for more documentation.
+synopsis: mtl flavoured typeful hierarchical structured logging for di-core.
+description: mtl flavoured typeful hierarchical structured logging for di-core.
 homepage: https://github.com/k0001/di
 bug-reports: https://github.com/k0001/di/issues
 
 library
   hs-source-dirs: lib
   default-language: Haskell2010
-  exposed-modules: Di
+  exposed-modules: Di.Monad
   build-depends:
     base >=4.9 && <5.0,
-    df1,
+    containers,
     di-core,
-    di-df1,
-    di-handle,
-    di-monad,
-    exceptions
+    exceptions,
+    mtl,
+    pipes,
+    stm,
+    transformers
   ghcjs-options: -Wall -O3
   ghc-options: -Wall -O2
 

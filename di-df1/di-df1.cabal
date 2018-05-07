@@ -1,0 +1,46 @@
+name: di-df1
+version: 1.0
+author: Renzo Carbonara
+maintainer: renλren.zone
+copyright: Renzo Carbonara 2018
+license: BSD3
+license-file: LICENSE.txt
+extra-source-files: README.md CHANGELOG.md
+category: Logging
+build-type: Simple
+cabal-version: >=1.18
+synopsis: Write logs in the df1 format using the di logging framework
+description: Write logs in the df1 format using the di logging framework.
+homepage: https://github.com/k0001/di
+bug-reports: https://github.com/k0001/di/issues
+
+library
+  hs-source-dirs: lib
+  default-language: Haskell2010
+  exposed-modules: Di.Df1 Di.Df1.Monad
+  build-depends:
+    base >=4.9 && <5.0,
+    df1,
+    di-core,
+    di-monad,
+    di-handle,
+    stm
+  ghcjs-options: -Wall -O3
+  ghc-options: -Wall -O2
+
+test-suite test
+  default-language: Haskell2010
+  type: exitcode-stdio-1.0
+  hs-source-dirs: test
+  main-is: Main.hs
+  build-depends:
+    base,
+    bytestring,
+    df1,
+    di-core,
+    di-df1,
+    QuickCheck,
+    text,
+    time,
+    tasty,
+    tasty-quickcheck

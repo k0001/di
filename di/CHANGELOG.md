@@ -1,3 +1,11 @@
+# Version 1.0
+
+* BREAKING CHANGE: Most of what used to be in this library lives now in
+  `di-core`. This library is now intended to be an entry point to the various
+  `di-*` libraries. Consider this first release of the new ecosystem a preview
+  release: The API is likely to stay stable, but extensive testing,
+  formalization and tooling is due.
+
 # Version 0.3
 
 * BREAKING CHANGE: `mkDiTextStderr` and `mkDiStringHandle` return a `Di String
