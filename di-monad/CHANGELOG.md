@@ -1,3 +1,7 @@
+# Version 1.0.1
+
+* Backwards compatibility with `transformers < 0.5.3`.
+
 # Version 1.0
 
 * This is a new library part of the `di-core` ecosystem.

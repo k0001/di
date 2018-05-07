@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
@@ -73,10 +74,8 @@ import qualified Control.Monad.RWS.Strict as RWSS
 import Control.Monad.State (MonadState)
 import qualified Control.Monad.State.Lazy as SL
 import qualified Control.Monad.State.Strict as SS
-import Control.Monad.Trans.Accum (AccumT(AccumT))
 import Control.Monad.Trans.Class (MonadTrans, lift)
 import Control.Monad.Trans.Maybe (MaybeT(MaybeT))
-import Control.Monad.Trans.Select (SelectT(SelectT))
 import Control.Monad.Writer (MonadWriter)
 import qualified Control.Monad.Writer.Lazy as WL
 import qualified Control.Monad.Writer.Strict as WS
@@ -85,6 +84,11 @@ import Data.Sequence (Seq)
 import qualified Pipes as P
 import qualified Pipes.Internal as P
 import Prelude hiding (filter, error, log)
+
+#if MIN_VERSION_transformers(0,5,3)
+import Control.Monad.Trans.Accum (AccumT(AccumT))
+import Control.Monad.Trans.Select (SelectT(SelectT))
+#endif
 
 import Di.Core (Di)
 import qualified Di.Core as Di
@@ -432,11 +436,6 @@ instance MonadDi level path msg m
   {-# INLINE local #-}
 
 instance (Monoid w, MonadDi level path msg m)
-  => MonadDi level path msg (AccumT w m) where
-  local f = \(AccumT gma) -> AccumT (\w -> local f (gma w))
-  {-# INLINE local #-}
-
-instance (Monoid w, MonadDi level path msg m)
   => MonadDi level path msg (WS.WriterT w m) where
   local f = \(WS.WriterT ma) -> WS.WriterT (local f ma)
   {-# INLINE local #-}
@@ -462,10 +461,6 @@ instance MonadDi level path msg m => MonadDi level path msg (ContT r m) where
   local f = \(ContT gma) -> ContT (\r -> local f (gma r))
   {-# INLINE local #-}
 
-instance MonadDi level path msg m => MonadDi level path msg (SelectT r m) where
-  local f = \(SelectT gma) -> SelectT (\r -> local f (gma r))
-  {-# INLINE local #-}
-
 instance (Monoid w, MonadDi level path msg m)
   => MonadDi level path msg (RWSS.RWST r w s m) where
   local f = \(RWSS.RWST gma) -> RWSS.RWST (\r s -> local f (gma r s))
@@ -475,6 +470,17 @@ instance (Monoid w, MonadDi level path msg m)
   => MonadDi level path msg (RWSL.RWST r w s m) where
   local f = \(RWSL.RWST gma) -> RWSL.RWST (\r s -> local f (gma r s))
   {-# INLINE local #-}
+
+#if MIN_VERSION_transformers(0,5,3)
+instance (Monoid w, MonadDi level path msg m)
+  => MonadDi level path msg (AccumT w m) where
+  local f = \(AccumT gma) -> AccumT (\w -> local f (gma w))
+  {-# INLINE local #-}
+
+instance MonadDi level path msg m => MonadDi level path msg (SelectT r m) where
+  local f = \(SelectT gma) -> SelectT (\r -> local f (gma r))
+  {-# INLINE local #-}
+#endif
 
 instance MonadDi level path msg m
   => MonadDi level path msg (P.Proxy a' a b' b m) where
