@@ -88,7 +88,6 @@ module Di
  , Di.Df1.Monad.emergency
 
    -- * Basic DiT support
- , Di.Monad.DiT
  , Di.Monad.runDiT
  , Di.Monad.hoistDiT
  ) where
