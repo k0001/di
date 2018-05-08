@@ -43,13 +43,16 @@
 -- 'Df1.Level', 'Df1.Path' and 'Df1.Message', and some other functions
 -- talk about @level@, @path@ and @msg@ type variables. This is
 -- because even while our particular set of choices require some monomorphic
--- types, the /di logging ecosystem/ treats these values polymorphically, so
--- they will show up in the types in one way or another, either in concrete or
--- polymorphic form. This can seem a bit noisy, but the good news is that if,
--- for example, want to call a third party library that uses other types
--- for conveying the idea of a “log importance level” or a “log message”,
--- then you can do so if you can convert between these different types.
--- For more information about this, see "Di.Monad" and "Di.Core", but not today.
+-- types, as demonstrated by the 'Di.Df1.Df1' and 'Di.Df1.Monad.MonadDf1'
+-- type-synonyms, the larger /di logging ecosystem/ treats these values
+-- polymorphically, so they will show up in the types in one way or another,
+-- either in concrete or polymorphic form. This can seem a bit noisy, but the
+-- good news is that if, for example, want to call a third party library that
+-- uses other types for conveying the idea of a “log importance level” or a “log
+-- message”, then you can do so if you can convert between these different
+-- types. You are of course encouraged to use the 'Di.Df1.Df1' and
+-- 'Di.Df1.Monad.MonadDf1' type-synonyms yourself.  For more information about
+-- this, see "Di.Monad" and "Di.Core", but not today.
 --
 -- The intended usage of this module is:
 --
@@ -58,10 +61,10 @@
 -- @
 module Di
  ( new
- , Di.Core.Di
+ , Di.Df1.Df1
 
    -- * Monadic API
- , Di.Monad.MonadDi
+ , Di.Df1.Monad.MonadDf1
 
    -- ** Hierarchy
  , Di.Df1.Monad.push
@@ -89,6 +92,7 @@ module Di
  , Di.Df1.Monad.emergency
 
    -- * Basic DiT support
+ , Di.Df1.Monad.Df1T
  , Di.Monad.runDiT
  , Di.Monad.hoistDiT
  ) where
@@ -115,9 +119,9 @@ import qualified Di.Monad
 -- main :: 'IO' ()
 -- main = do
 --    'new' $ \\di -> do
+--       -- /The rest of your program goes here./
+--       -- /You can start logging right away./
 --       'Di.Monad.runDiT' di $ do
---           -- /The rest of your program goes here./
---           -- /You can start logging right away./
 --           'Di.Df1.Monad.notice' "Welcome to my program!"
 --           -- /You can use 'Di.Df1.Monad.push' to separate different/
 --           -- /logging scopes of your program:/
@@ -150,17 +154,18 @@ import qualified Di.Monad
 new
   :: (MonadIO m, Ex.MonadMask m)
   => (Di.Core.Di Df1.Level Df1.Path Df1.Message -> m a)
+  -- ^ /This type is the same as @'Di.Df1.Df1' -> m a@./
+  --
   -- ^ Within this scope, you can use the obtained 'Di.Core.Di' safely, even
   -- concurrently. As soon as @m a@ finishes, 'new' will block until
   -- all logs have finished processing, before returning.
   --
-  -- /WARNING:/ Even while
-  -- @'new' commit 'pure' :: m ('Di.Core.Di' 'Df1.Level' 'Df1.Path' 'Df1.Message')@
-  -- type-checks, and you can use it to work with the 'Di.Core.Di' outside the
-  -- intended scope, you will have to remember to call 'Di.Monad.flush'
-  -- yourself before exiting your application. Otherwise, some log messages may
-  -- be left unprocessed. If possible, use the 'Di.Core.Di' within this function
-  -- and don't let it escape this scope.
+  -- /WARNING:/ Even while @'new' commit 'pure' :: m ('Di.Core.Di' 'Df1.Level'
+  -- 'Df1.Path' 'Df1.Message')@ type-checks, and you can use it to work with the
+  -- 'Di.Core.Di' outside the intended scope, you will have to remember to call
+  -- 'Di.Monad.flush' yourself before exiting your application. Otherwise, some
+  -- log messages may be left unprocessed. If possible, use the 'Di.Core.Di'
+  -- within this function and don't let it escape this scope.
   -> m a -- ^
 new act = do
   commit <- Di.Handle.stderr Di.Df1.df1

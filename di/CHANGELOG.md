@@ -1,8 +1,10 @@
 # Version 1.0.1
 
-* COMPILER ASSISTED BREAKING CHANGE: We don't export `DiT` anymore.
+* COMPILER ASSISTED BREAKING CHANGE: We don't export `Di`, `DiT` nor `MonadDi`
+  anymore.
 
-* Re-export `Df1.Path`, `Df1.Level`.
+* Re-export `Df1.Path`, `Df1.Level`, `Di.Df1.Df1`, `Di.Df1.Monad.Df1T`,
+  `Di.Df1.Monad.MonadDf1`.
 
 
 
