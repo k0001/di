@@ -1,9 +1,13 @@
+{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 
 -- | This module exports an API compatible with "Di.Monad".
 module Di.Df1.Monad
- ( -- * Hierarchy
-   push
+ ( Df1T
+ , MonadDf1
+
+   -- * Hierarchy
+ , push
    -- * Metadata
  , attr
    -- * Messages
@@ -20,7 +24,46 @@ module Di.Df1.Monad
 import Prelude hiding (error)
 
 import qualified Df1
-import qualified Di.Monad as Di (MonadDi, log, push)
+import qualified Di.Monad as Di
+
+--------------------------------------------------------------------------------
+
+-- | Convenience type-synonym for a 'Di.DiT' restricted to all the /df1/
+-- monomorphic types.
+--
+-- @
+-- 'Df1T' == 'Di.DiT' 'Df1.Level' 'Df1.Path' 'Df1.Message'
+--    :: (* -> *) -> * -> *
+--
+-- 'Df1T' m == 'Di.DiT' 'Df1.Level' 'Df1.Path' 'Df1.Message' m
+--    :: * -> *
+--
+-- 'Df1T' m a == 'Di.DiT' 'Df1.Level' 'Df1.Path' 'Df1.Message' m a
+--    :: *
+-- @
+--
+-- This type-synonym is not used within the @di-df1@ library itself because
+-- all functions exposed in the library have more general types. However,
+-- users are encouraged to use 'MonadDf1' if they find it useful to reduce
+-- boilerplate and improve type inferrence.
+type Df1T = Di.DiT Df1.Level Df1.Path Df1.Message
+
+-- | Convenience type-synonym for a 'Di.MonadDi' restricted to all the /df1/
+-- monomorphic types.
+--
+-- @
+-- 'MonadDf1' == 'Di.MonadDi' 'Df1.Level' 'Df1.Path' 'Df1.Message'
+--    :: (* -> *) -> 'GHC.Exts.Constraint'
+--
+-- 'MonadDf1' m == 'Di.MonadDi' 'Df1.Level' 'Df1.Path' 'Df1.Message' m
+--    :: 'GHC.Exts.Constraint'
+-- @
+--
+-- This type-synonym is not used within the @di-df1@ library itself because
+-- all functions exposed in the library have more general types. However,
+-- users are encouraged to use 'MonadDf1' if they find it useful to reduce
+-- boilerplate and improve type inferrence.
+type MonadDf1 = Di.MonadDi Df1.Level Df1.Path Df1.Message
 
 --------------------------------------------------------------------------------
 

@@ -1,3 +1,8 @@
+# Version 1.0.2
+
+* Added `Df1`, `Df1T` and `MonadDf1` type-synonyms.
+
+
 # Version 1.0.1
 
 * Removed unnecessary `MonadIO` constraint.

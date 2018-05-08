@@ -15,8 +15,10 @@
 -- Consider this a preview release: The API is likely to stay stable, but
 -- extensive testing, formalization and tooling is due.
 module Di.Df1
- ( -- * Hierarchy
-   push
+ ( Df1
+
+   -- * Hierarchy
+ , push
    -- * Metadata
  , attr
    -- * Messages
@@ -53,6 +55,22 @@ import Unsafe.Coerce (unsafeCoerce)
 import qualified Di.Core as Di (Di, Log(Log), log, log', push)
 import qualified Di.Handle as Di (LineRenderer(LineRendererUtf8))
 import qualified Df1
+
+--------------------------------------------------------------------------------
+
+-- | Convenience type-synonym for a 'Di.Di' restricted to all the /df1/
+-- monomorphic types.
+--
+-- @
+-- 'Df1' == 'Di.Di' 'Df1.Level' 'Df1.Path' 'Df1.Message'
+--    :: *
+-- @
+--
+-- This type-synonym is not used within the @di-df1@ library itself because
+-- all functions exposed in the library have more general types. However,
+-- users are encouraged to use 'Df1' if they find it useful to reduce
+-- boilerplate and improve type inferrence.
+type Df1 = Di.Di Df1.Level Df1.Path Df1.Message
 
 --------------------------------------------------------------------------------
 
