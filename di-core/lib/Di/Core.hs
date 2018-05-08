@@ -366,8 +366,9 @@ push p = \di -> di
 -- 'contralevel' function:
 --
 -- @
--- 'contralevel' (\\case { Info -> Info'; Error -> Error' }) (di :: 'Di' Level' 'String' msg)
---     :: 'Di' Level 'Int' msg
+-- 'contralevel' (\\case { Info -> Info'; Error -> Error' })
+--             (di :: 'Di' Level' 'String' msg)
+--     :: 'Di' Level 'String' msg
 -- @
 --
 -- Identity:
