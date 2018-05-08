@@ -14,7 +14,6 @@ import Data.Monoid ((<>))
 import qualified Data.Sequence as Seq
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
-import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as TL
 import qualified Data.Time as Time
 import qualified Data.Time.Clock.System as Time
@@ -87,16 +86,20 @@ renderPath = fix $ \f -> \case
   ps Seq.:|> Push s -> f ps <> slash <> renderSegment s <> space
   Seq.Empty -> mempty
 
+-- | Escaping rules for 'Segment':
+--
+-- * A \'%' anywhere is always percent-escaped (\"%25")"
+--
+-- * A 'isControl7' char anywhere is always percent-escaped.
 renderMessage :: Message -> BB.Builder
 {-# INLINE renderMessage #-}
-renderMessage = escapeMessage . unMessage
-
-escapeMessage :: TL.Text -> BB.Builder
-{-# INLINE escapeMessage #-}
-escapeMessage = TL.encodeUtf8BuilderEscaped
-  $ BBP.condB (== 37) word8HexPercent  -- '%'
-  $ BBP.condB (<= 31) word8HexPercent  -- control characters
-  $ BBP.liftFixedToBounded BBP.word8
+renderMessage x = eall (unMessage x)
+  where
+    {-# INLINE eall #-}
+    eall = TL.encodeUtf8BuilderEscaped
+      $ BBP.condB (== 37) word8HexPercent  -- '%'
+      $ BBP.condB isControl7 word8HexPercent
+      $ BBP.liftFixedToBounded BBP.word8
 
 -- | Escaping rules for 'Segment':
 --

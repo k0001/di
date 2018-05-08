@@ -1,5 +1,7 @@
 # Version 0.1.2
 
+* Fixed escaping of control characters in `Message`.
+
 * Percent-escape less punctuation characters when rendering `Key`, `Segment` and
   `Value`.
 
