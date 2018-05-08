@@ -12,6 +12,8 @@ import qualified Data.ByteString.Builder.Prim as BBP
 import Data.Function (fix)
 import Data.Monoid ((<>))
 import qualified Data.Sequence as Seq
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as TL
 import qualified Data.Time as Time
@@ -96,29 +98,82 @@ escapeMessage = TL.encodeUtf8BuilderEscaped
   $ BBP.condB (<= 31) word8HexPercent  -- control characters
   $ BBP.liftFixedToBounded BBP.word8
 
+-- | Escaping rules for 'Segment':
+--
+-- * A 'isPunctuation7' in the first character is always percent-escaped.
+--
+-- * A 'isPunctuation7' anywhere else is always percent-escaped, unless it is
+--   \'-' or \'_'.
+--
+-- * A 'isControl7' char anywhere is always percent-escaped.
 renderSegment :: Segment -> BB.Builder
 {-# INLINE renderSegment #-}
-renderSegment = escapeMetaL . TL.fromStrict . unSegment
+renderSegment x = case T.uncons (unSegment x) of
+    Nothing -> mempty
+    Just (hd,tl) -> ehead (T.singleton hd) <> etail tl
+  where
+    {-# INLINE ehead #-}
+    ehead = T.encodeUtf8BuilderEscaped
+      $ BBP.condB isPunctuation7 word8HexPercent
+      $ BBP.condB isControl7 word8HexPercent
+      $ BBP.liftFixedToBounded BBP.word8
+    {-# INLINE etail #-}
+    etail = T.encodeUtf8BuilderEscaped
+      $ BBP.condB (\w -> w == 0x2d    -- '-'
+                      || w == 0x5f)   -- '_'
+                  (BBP.liftFixedToBounded BBP.word8)
+      $ BBP.condB isPunctuation7 word8HexPercent
+      $ BBP.condB isControl7 word8HexPercent
+      $ BBP.liftFixedToBounded BBP.word8
 
+-- | Escaping rules for 'Key':
+--
+-- * A 'isControl7' char anywhere is always percent-escaped.
+--
+-- * A 'isPunctuation7' in the first character is always percent-escaped.
+--
+-- * A 'isPunctuation7' anywhere else is always percent-escaped, unless it is
+--   \'-' or \'_'.
 renderKey :: Key -> BB.Builder
 {-# INLINE renderKey #-}
-renderKey = escapeMetaL . TL.fromStrict . unKey
+renderKey x = case T.uncons (unKey x) of
+    Nothing -> mempty
+    Just (hd,tl) -> ehead (T.singleton hd) <> etail tl
+  where
+    {-# INLINE ehead #-}
+    ehead = T.encodeUtf8BuilderEscaped
+      $ BBP.condB isPunctuation7 word8HexPercent
+      $ BBP.condB isControl7 word8HexPercent
+      $ BBP.liftFixedToBounded BBP.word8
+    {-# INLINE etail #-}
+    etail = T.encodeUtf8BuilderEscaped
+      $ BBP.condB (\w -> w == 0x2d    -- '-'
+                      || w == 0x5f)   -- '_'
+                  (BBP.liftFixedToBounded BBP.word8)
+      $ BBP.condB isPunctuation7 word8HexPercent
+      $ BBP.condB isControl7 word8HexPercent
+      $ BBP.liftFixedToBounded BBP.word8
 
+-- | Escaping rules for 'Value':
+--
+-- * A \' ' anywhere is always percent-escaped (\"%20").
+--
+-- * A \'%' anywhere is always percent-escaped (\"%25")"
+--
+-- * A \'=' anywhere is always percent-escaped (\"%3d").
+--
+-- * A 'isControl7' char anywhere is always percent-escaped.
 renderValue :: Value -> BB.Builder
 {-# INLINE renderValue #-}
-renderValue = escapeMetaL . unValue
-
--- | Escape metadata such as path segments, attribute keys or attribute values.
-escapeMetaL :: TL.Text -> BB.Builder
-{-# INLINE escapeMetaL #-}
-escapeMetaL = TL.encodeUtf8BuilderEscaped
-   $ BBP.condB
-        (\w -> (w <= 47)               -- Control and separator-like
-            || (w >= 58 && w <= 64)    -- Delimiter-like
-            || (w >= 91 && w <= 96)    -- Delimiter-like
-            || (w >= 123 && w <= 127)) -- Delimiter-like and DEL
-        word8HexPercent
-   $ BBP.liftFixedToBounded BBP.word8
+renderValue x = eall (unValue x)
+  where
+    {-# INLINE eall #-}
+    eall = TL.encodeUtf8BuilderEscaped
+      $ BBP.condB (== 0x20) word8HexPercent
+      $ BBP.condB (== 0x25) word8HexPercent
+      $ BBP.condB (== 0x3d) word8HexPercent
+      $ BBP.condB isControl7 word8HexPercent
+      $ BBP.liftFixedToBounded BBP.word8
 
 --------------------------------------------------------------------------------
 -- Some hardcoded stuff we use time and time again
@@ -299,3 +354,17 @@ _zero8 = BB.string7 "00000000"
 {-# INLINE _zero6 #-}
 {-# INLINE _zero7 #-}
 {-# INLINE _zero8 #-}
+
+-- | 'True' for all ASCII-7 punctuation characters.
+isPunctuation7 :: Word8 -> Bool
+{-# INLINE isPunctuation7 #-}
+isPunctuation7 w =
+  (w >= 32 && w <= 47)   ||
+  (w >= 58 && w <= 64)   ||
+  (w >= 91 && w <= 96)   ||
+  (w >= 123 && w <= 126)
+
+-- | 'True' for ASCII-7 control characters.
+isControl7 :: Word8 -> Bool
+{-# INLINE isControl7 #-}
+isControl7 w = (w <= 31) || (w == 127)

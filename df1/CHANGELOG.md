@@ -1,3 +1,11 @@
+# Version 0.1.2
+
+* Percent-escape less punctuation characters when rendering `Key`, `Segment` and
+  `Value`.
+
+  TODO: write spec.
+
+
 # Version 0.1.1
 
 * Fixed compilation.
