@@ -3,7 +3,7 @@
 }:
 mkDerivation {
   pname = "di";
-  version = "1.0";
+  version = "1.0.1";
   src = ./.;
   libraryHaskellDepends = [
     base df1 di-core di-df1 di-handle di-monad exceptions

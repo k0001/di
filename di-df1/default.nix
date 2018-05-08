@@ -1,1 +1,1 @@
-(import ../release.nix {}).di-df1
+(import ../default.nix {}).di-df1

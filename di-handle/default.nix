@@ -1,1 +1,1 @@
-(import ../release.nix {}).di-handle
+(import ../default.nix {}).di-handle

@@ -1,1 +1,1 @@
-(import ../release.nix {}).di
+(import ../default.nix {}).di

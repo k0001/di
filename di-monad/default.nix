@@ -1,1 +1,1 @@
-(import ../release.nix {}).di-monad
+(import ../default.nix {}).di-monad

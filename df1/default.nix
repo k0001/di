@@ -1,1 +1,1 @@
-(import ../release.nix {}).df1
+(import ../default.nix {}).df1
