@@ -251,7 +251,7 @@ instance Monoid Value where
 -- For example, consider a /df1/ log line as like the following:
 --
 -- @
--- 1999-12-20T07:11:39.230553031Z /foo x=a y=b /qux z=c z=d WARNING Something
+-- 1999-12-20T07:11:39.230553031Z \/foo x=a y=b \/qux z=c z=d WARNING Something
 -- @
 --
 -- For that line, the 'log_path' attribute of the 'Log' datatype will contain
