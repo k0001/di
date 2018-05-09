@@ -392,7 +392,7 @@ contralevel f = \di -> di
 -- | A 'Di' is contravariant in its @path@ argument.
 --
 -- This function is used to go from a /more general/ to a /more specific/ type
--- of @path@. For example, 'Int@ is a more specific type than 'String',
+-- of @path@. For example, 'Int' is a more specific type than 'String',
 -- since the former clearly conveys the idea of a number, whereas the
 -- latter could be anything that is representable as 'String', such as
 -- names of fruits and poems. We can convert from the more general to the
