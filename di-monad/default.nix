@@ -1,1 +1,1 @@
-(import ../default.nix {}).di-monad
+(import ../pkgs.nix {})._here.ghc841.di-monad

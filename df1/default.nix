@@ -1,1 +1,1 @@
-(import ../default.nix {}).df1
+(import ../pkgs.nix {})._here.ghc841.df1
