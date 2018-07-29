@@ -1,1 +1,1 @@
-(import ../default.nix {}).di-handle
+(import ../pkgs.nix {})._here.ghc841.di-handle
