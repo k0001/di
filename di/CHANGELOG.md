@@ -1,3 +1,10 @@
+# Version 1.1
+
+* **BREAKING CHANGE:** Exceptions are now logged _at the throw site_ by
+  default now when possible, with level `Warning`. See the changelog for
+  `di-monad-1.1`.
+
+
 # Version 1.0.1
 
 * COMPILER ASSISTED BREAKING CHANGE: We don't export `Di`, `DiT` nor `MonadDi`

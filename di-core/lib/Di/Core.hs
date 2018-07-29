@@ -11,8 +11,11 @@ module Di.Core
  , log'
  , flush
  , flush'
+ , throw
+ , throw'
  , push
  , filter
+ , onException
  , contralevel
  , contrapath
  , contramsg
@@ -21,14 +24,16 @@ module Di.Core
 
 import Control.Concurrent (forkFinally)
 import Control.Concurrent.STM
-  (STM, atomically, check,
+  (STM, atomically, check, throwSTM,
    TQueue, writeTQueue, newTQueueIO, readTQueue, peekTQueue, isEmptyTQueue)
-import Control.Exception as Ex
+import qualified Control.Exception as Ex
   (BlockedIndefinitelyOnSTM, AsyncException, asyncExceptionFromException)
 import qualified Control.Monad.Catch as Ex
 import Control.Monad (when)
 import Control.Monad.IO.Class (MonadIO, liftIO)
+import Data.Foldable (foldl')
 import Data.Function (fix)
+import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
 import qualified Data.Time.Clock.System as Time
 import GHC.Conc (unsafeIOToSTM)
@@ -70,13 +75,16 @@ import Prelude hiding (log, filter)
 -- the spanish word for an imperative form of the verb \"decir", which in
 -- english means "to say", which clearly must have something to do with logging.
 data Di level path msg = Di
-  { di_filter :: !(level -> Seq.Seq path -> msg -> Bool)
+  { di_filter :: !(level -> Seq path -> msg -> Bool)
     -- ^ Whether a particular combination of @level@, @path@s and @msg@ should
     -- be logged.
   , di_send :: !(Log level path msg -> STM ())
     -- ^ Send a 'Log' for processing.
   , di_flush :: !(STM ())
     -- ^ Block until all logs finish being processed.
+  , di_logex :: Ex.SomeException -> Maybe (STM ())
+    -- ^ If an exception deserves logging, then returns an 'STM' action
+    -- that will perform the logging.
   }
 
 --------------------------------------------------------------------------------
@@ -96,7 +104,11 @@ data Di level path msg = Di
 --        -- You can start logging right away.
 -- @
 --
--- Using the obtained 'Di' concurrently is fine.
+-- Using the obtained 'Di' concurrently is safe.
+--
+-- Note that by default, exceptions thrown using 'throw' won't be logged.
+-- Please use 'onException' to change this behavior. Morevoer, the default
+-- 'filter' on this 'Di' accepts all incoming logs.
 new
   :: (MonadIO m, Ex.MonadMask m)
   => (Log level path msg -> IO ())
@@ -135,6 +147,7 @@ new commit act = do
           Nothing -> k >> pure ()
     let di = Di { di_filter = \_ _ _ -> True
                 , di_send = writeTQueue tqLogs
+                , di_logex = \_ -> Just (pure ())
                 , di_flush = check =<< isEmptyTQueue tqLogs }
     -- By flushing before returning we ensure all messages are logged. This
     -- is the main reason why 'new' limits the 'Di' scope as it does.
@@ -312,6 +325,93 @@ flush'
 flush' nat di = nat (di_flush di)
 {-# INLINE flush' #-}
 
+-- | This is like 'throw', but it doesn't require a 'MonadIO' constraint.
+throw'
+  :: (Ex.MonadMask m, Ex.Exception e)
+  => (forall x. STM x -> m x)
+  -- ^ Natural transformation from 'STM' to @m@.
+  --
+  -- Note that it is not necessary for this /natural transofmation/ to be a
+  -- /monad morphism/ as well. That is, using 'atomically' here is acceptable.
+  --
+  -- Any exception thrown by this natural transformation will be silenced, since
+  -- the passed in 'Ex.Exception' has priority.
+  --
+  -- Note that this can not be 'id' because throwing an exception from
+  -- 'STM' aborts the transaction and prevents the log message from being sent,
+  -- as is expected. This is prevented by the 'Ex.MonadMask' constraint, which
+  -- is not satisfied by 'STM'.
+  -> Di level path msg
+  -> e  -- ^ 'Ex.Exception'.
+  -> m a
+throw' nat di = \e -> Ex.mask_ $ do
+  -- If logging `e` throws a new exception, then we 'mute' it
+  -- because the original `e` exception has priority.
+  mute (nat (sequence_ (di_logex di (Ex.toException e))))
+  -- By throwing from inside 'STM' we avoid potentially entering into an
+  -- infinite loop in case the implementation of 'Ex.throwM' would take us back
+  -- to 'throw''. Also, notice that we need to call `nat` again here, otherwise
+  -- if we were to run `throwSTM` in the same transaction as `di_logex`, the
+  -- transaction would be aborted and never be sent. The fact that we have to
+  -- run `nat` twice requires a `Ex.MonadMask` constraint as well, so that we
+  -- prevent async exceptions in between them.
+  nat (throwSTM e)
+{-# INLINABLE throw' #-}
+
+-- | Throw an 'Ex.Exception', but not without logging it first according to the
+-- rendering rules established by 'onException', and further restricted by the
+-- filtering rules established by 'filter'.
+--
+-- If the exception is not logged, then this function behaves as
+-- 'Ex.throwM'.
+--
+-- @
+-- 'throw' ('onException' ('const' 'False') di)  ==  'Ex.throwM'
+-- @
+--
+-- /Note:/ Any new exception that might happen as part of the logging process is
+-- silenced, so that the originally thrown exception is the one that has
+-- precendence.
+throw
+  :: (MonadIO m, Ex.MonadMask m, Ex.Exception e)
+  => Di level path msg
+  -> e  -- ^ 'Ex.Exception'.
+  -> m a
+throw di = throw' (liftIO . atomically) di
+{-# INLINABLE throw #-}
+
+-- | Modifies a 'Di' so that exceptions thrown with 'throw' could be logged as a
+-- @msg@ with a particular @level@ if both the passed in function returns
+-- 'Just', and 'filter' so allows it afterwards.
+--
+-- If the given function returns 'Nothing', then no logging is performed.
+--
+-- The returned @'Seq' path@ will extend the 'path' /at the throw site/ before
+-- sending the log. The leftmost @path@ is closest to the root.
+--
+-- Composition:
+--
+-- @
+-- 'onException' f . 'onException' g   ==   'onException' (g e *> f e)
+-- @
+--
+-- Notice that the @level@, @path@s and @msg@ resulting from @g@ are discarded,
+-- yet its policy regarding whether to log or not is preserved in the same way
+-- as 'filter'. That is, 'onException' can't accept an exception already
+-- rejected by a previous use of 'onException', but it can reject a previously
+-- accepted one.
+onException
+  :: (Ex.SomeException -> Maybe (level, Seq path, msg))
+  -> Di level path msg
+  -> Di level path msg  -- ^
+onException f = \di0 -> di0
+  { di_logex = \se -> do
+      _ <- di_logex di0 se
+      (l, ps, m) <- f se
+      let di1 = foldl' (flip push) di0 ps
+      Just (log' id di1 l m)
+  }
+
 -- | Returns a new 'Di' on which only messages with @level@, @path@s and
 -- @msg@ satisfying the given predicate—in addition to any previous
 -- 'filter's—are ever logged.
@@ -328,19 +428,22 @@ flush' nat di = nat (di_flush di)
 -- 'filter' (\\l ps m -> f l ps m '&&' g l ps m)  ==  'filter' f . 'filter' g
 -- @
 --
+-- Notice how 'filter' can't accept a message already rejected by a previous use
+-- of 'filter', yet it can reject a previously accepted one.
+--
 -- Commutativity:
 --
 -- @
 -- 'filter' f . 'filter' g  ==  'filter' g . 'filter' f
 -- @
 filter
-  :: (level -> Seq.Seq path -> msg -> Bool)
+  :: (level -> Seq path -> msg -> Bool)
   -- ^ Whether a particular log entry with the given @level@, @path@s and
   -- @msg@ should be logged.
   --
   -- The given @path@s indicate where the 'log' call was made from, with an
-  -- empty 'Seq.Seq' representing 'log' calls made at the current depth level
-  -- (see 'push'). The leftmost @path@ in the 'Seq.Seq' is the most immediate
+  -- empty 'Seq' representing 'log' calls made at the current depth level
+  -- (see 'push'). The leftmost @path@ in the 'Seq' is the most immediate
   -- child, while the rightmost is the most distand child (i.e., the @path@
   -- closest to the place where 'log' call actually took place).
   -> Di level path msg
@@ -417,7 +520,8 @@ contralevel f = \di -> di
 contrapath :: (path -> path') -> Di level path' msg -> Di level path msg
 contrapath f = \di -> di
   { di_send = \x -> di_send di (x { log_path = fmap f (log_path x) })
-  , di_filter = \l ps m -> di_filter di l (fmap f ps) m }
+  , di_filter = \l ps m -> di_filter di l (fmap f ps) m
+  }
 {-# INLINABLE contrapath #-}
 
 -- | A 'Di' is contravariant in its @msg@ argument.
@@ -464,7 +568,7 @@ data Log level path msg = Log
   , log_level :: !level
     -- ^ Importance level of the logged message (e.g., “info”, “warning”,
     -- “error”, etc.).
-  , log_path :: !(Seq.Seq path)
+  , log_path :: !(Seq path)
     -- ^ Path where the logged message was created from.
     --
     -- The leftmost @path@ is the root @path@. The rightmost @path@ is the

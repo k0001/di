@@ -1,5 +1,5 @@
 name: di
-version: 1.0.1
+version: 1.1
 author: Renzo Carbonara
 maintainer: renλren.zone
 copyright: Renzo Carbonara 2017-2018
@@ -26,6 +26,7 @@ library
   exposed-modules: Di
   build-depends:
     base >=4.9 && <5.0,
+    containers,
     df1,
     di-core,
     di-df1,

@@ -1,3 +1,18 @@
+# Version 1.1
+
+* **BREAKING CHANGE:** The `MonadThrow` instance for `DiT level path msg
+  m` instance now relies on `Di.Core.throw`, potentially logging
+  exceptions _at the throw site_.  This introduces a new `MonadMask m`
+  instance constraint which can't be satisfied by `STM`. There is a
+  `DiT level path msg STM` instance that skips logging exceptions (which
+  is the only sensible behavior, anyway). However, if your `m` is not
+  exactly `STM` but some wrapper around it, you will need to provide a
+  `MonadThrow` instance manually or use `Di.Core.throw'` directly. On
+  the other hand, satisfying this `MonadMask` constraint should be easy
+  for monads that can run `IO`.
+
+* Added `onException`.
+
 # Version 1.0.2
 
 * Backwards compatibility with `mtl < 2.2.2`.

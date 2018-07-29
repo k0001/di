@@ -43,10 +43,11 @@
 module Di.Monad
  ( -- * MonadDi
    MonadDi(ask, local, natSTM)
+ , log
  , flush
  , push
  , filter
- , log
+ , onException
 
  , -- * DiT
    DiT
@@ -58,8 +59,8 @@ module Di.Monad
  ) where
 
 import Control.Applicative (Alternative)
-import Control.Concurrent.STM (STM, atomically)
-import Control.Monad.Catch as Ex
+import Control.Concurrent.STM (STM, atomically, throwSTM)
+import qualified Control.Monad.Catch as Ex
 import Control.Monad.Cont (MonadCont, ContT(ContT))
 import Control.Monad.Except (ExceptT(ExceptT))
 import Control.Monad.Fail (MonadFail)
@@ -320,11 +321,31 @@ instance MonadReader r m => MonadReader r (DiT level path msg m) where
     DiT (ReaderT (\di -> Reader.local f (gma di)))
   {-# INLINE local #-}
 
-instance Ex.MonadThrow m => Ex.MonadThrow (DiT level path msg m) where
-  throwM = \x -> lift (Ex.throwM x)
+-- | Throw an 'Ex.Exception', but not without logging it first according to the
+-- rules established by 'onException', and further restricted by the rules
+-- established by 'filter'.
+--
+-- /Note:/ Any new exception that might happen as part of the logging process is
+-- silenced, so that the originally thrown exception is the one that has
+-- precendence.
+--
+-- Note that the 'Ex.MonadMask' superclass prevents @m@'s base monad to be
+-- 'STM'. There is another instance where @m ~ 'STM'@, but you will need to
+-- write your own instance or use 'Di.throw'' directly if @m@ is a wrapper
+-- around 'STM' and not 'STM' itself. On the other hand, the 'Ex.MonadMask'
+-- constraint should be easy to satisfy by all wrappers around 'IO', even those
+-- that don't implement 'MonadIO'.
+instance Ex.MonadMask m => Ex.MonadThrow (DiT level path msg m) where
+  throwM e = ask >>= \di -> Di.throw' natSTM di e
   {-# INLINE throwM #-}
 
-instance Ex.MonadCatch m => Ex.MonadCatch (DiT level path msg m) where
+-- | This instance doesn't log exceptions before throwing them.
+instance Ex.MonadThrow (DiT level path msg STM) where
+  throwM = lift . throwSTM
+  {-# INLINE throwM #-}
+
+instance (Ex.MonadThrow (DiT level path msg m), Ex.MonadCatch m)
+  => Ex.MonadCatch (DiT level path msg m) where
   catch (DiT (ReaderT f)) = \g -> DiT (ReaderT (\x ->
     Ex.catch (f x) (\e -> let DiT (ReaderT h) = g e in h x)))
   {-# INLINE catch #-}
@@ -574,3 +595,31 @@ filter f = local (Di.filter f)
 push :: MonadDi level path msg m => path -> m a -> m a
 push p = local (Di.push p)
 {-# INLINE push #-}
+
+-- | Within the passed given @m a@, exceptions thrown with 'Ex.throwM' could
+-- could be logged as a @msg@ with a particular @level@ if both the passed in
+-- function returns 'Just', and 'filter' so allows it afterwards.
+--
+-- If the given function returns 'Nothing', then no logging is performed.
+--
+-- The returned @'Seq.Seq' path@ will extend the 'path' at the 'throw' call site
+-- before sending the log. The leftmost @path@ is closest to the root.
+--
+-- Composition:
+--
+-- @
+-- 'onException' f . 'onException' g   ==   'onException' (g e *> f e)
+-- @
+--
+-- Notice that the @level@, @path@s and @msg@ resulting from @g@ are discarded,
+-- yet its policy regarding whether to log or not is preserved in the same way
+-- as 'filter'. That is, 'onException' can't accept an exception already
+-- rejected by a previous use of 'onException', but it can reject a previously
+-- accepted one.
+onException
+  :: MonadDi level path msg m
+  => (Ex.SomeException -> Maybe (level, Seq path, msg))
+  -> m a
+  -> m a
+onException f = local (Di.onException f)
+
