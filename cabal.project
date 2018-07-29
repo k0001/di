@@ -1,9 +1,7 @@
 packages:
   df1/
-  df1-cli/
   di/
   di-core/
   di-df1/
   di-handle/
   di-monad/
-

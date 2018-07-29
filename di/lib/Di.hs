@@ -8,9 +8,9 @@
 -- but if you find these are not sufficient for your particular use case, please
 -- refer to other libraries of the /di logging ecosystem/ such as
 -- [di-core](https://hackage.haskell.org/package/di-core),
--- [di-monad](https://hackage.haskell.org/package/di-core),
--- [di-handle](https://hackage.haskell.org/package/di-core), or
--- [di-df1](https://hackage.haskell.org/package/di-core), and you are likely
+-- [di-monad](https://hackage.haskell.org/package/di-monad),
+-- [di-handle](https://hackage.haskell.org/package/di-handle), or
+-- [di-df1](https://hackage.haskell.org/package/di-df1), and you are likely
 -- to find a compatible and composable solution there. For this reason, staring
 -- with this package rather than one of the those other lower-level packages is
 -- always recommended.
@@ -38,6 +38,8 @@
 --   importance 'Df1.Level's.
 --
 -- * We commit logs to the outside world by printing them to 'System.IO.stderr'.
+--
+-- * Exceptions are logged at their throw site (see 'Di.Core.onException').
 --
 -- You will notice that some of the functions in this module mention the types
 -- 'Df1.Level', 'Df1.Path' and 'Df1.Message', and some other functions
@@ -99,6 +101,8 @@ module Di
 
 import Control.Monad.Catch as Ex
 import Control.Monad.IO.Class (MonadIO)
+import Data.Sequence (Seq)
+import Data.String (fromString)
 
 import qualified Df1
 import qualified Di.Core
@@ -137,6 +141,7 @@ import qualified Di.Monad
 --                    'Di.Df1.Monad.push' "handler" $ do
 --                       'Di.Df1.Monad.attr' "client-address" clientAddress $ do
 --                          'Di.Df1.Monad.info' "Connection established"
+--                          'Ex.throwM' ('userError' "Oops!")
 -- @
 --
 -- That program will render something like this to 'System.IO.stderr' (in colors!):
@@ -146,7 +151,11 @@ import qualified Di.Monad
 -- 2018-05-06T19:48:06.195041422Z \/initialization NOTICE Starting web server
 -- 2018-05-06T19:48:06.195052862Z \/server port=80 INFO Listening for new clients
 -- 2018-05-06T19:48:06.195059084Z \/server port=80 \/handler client%2daddress=192%2e168%2e0%2e25%3a32528 INFO Connection established
+-- 2018-05-06T19:48:06.195059102Z \/server port=80 \/handler client%2daddress=192%2e168%2e0%2e25%3a32528 exception=user%20error%20(Oops!) WARNING Exception thrown
 -- @
+--
+-- Notice that by default, /all/ exceptions thrown using 'Ex.throwM' or
+-- 'Di.throw' are logged /at their throw site/ with 'Df1.Warning' level.
 --
 -- (Unrelated: Notice how /df1/ escapes pretty much all punctuation characters.
 -- This is temporal until /df1/ is formalized and a more limited set of
@@ -169,5 +178,16 @@ new
   -> m a -- ^
 new act = do
   commit <- Di.Handle.stderr Di.Df1.df1
-  Di.Core.new commit act
+  Di.Core.new commit $ \di -> do
+     act (Di.Core.onException exceptionHandler di)
+
+exceptionHandler
+  :: Ex.SomeException
+  -> Maybe (Df1.Level, Seq Df1.Path, Df1.Message)
+{-# INLINE exceptionHandler #-}
+exceptionHandler = \se -> Just
+  ( Df1.Warning
+  , pure (Df1.Attr "exception" (fromString (show se)))
+  , "Exception thrown"
+  )
 
