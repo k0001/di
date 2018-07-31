@@ -1,3 +1,5 @@
+{ pkgs }:
+
 # To be used as `packageSetConfig` for a Haskell pacakge set:
 let
 exceptions =
@@ -55,6 +57,7 @@ pipes =
 in
 self: super:
 {
+  safe-exceptions = pkgs.haskell.lib.doJailbreak super.safe-exceptions;
   exceptions = super.callPackage exceptions {};
   pipes = super.callPackage pipes {};
   df1 = super.callPackage ./df1/pkg.nix {};
