@@ -59,7 +59,7 @@ module Di.Monad
  ) where
 
 import Control.Applicative (Alternative)
-import Control.Concurrent.STM (STM, atomically, throwSTM)
+import Control.Concurrent.STM (STM, atomically)
 import qualified Control.Monad.Catch as Ex
 import Control.Monad.Cont (MonadCont, ContT(ContT))
 import Control.Monad.Except (ExceptT(ExceptT))
@@ -325,27 +325,14 @@ instance MonadReader r m => MonadReader r (DiT level path msg m) where
 -- rules established by 'onException', and further restricted by the rules
 -- established by 'filter'.
 --
--- /Note:/ Any new exception that might happen as part of the logging process is
--- silenced, so that the originally thrown exception is the one that has
--- precendence.
---
--- Note that the 'Ex.MonadMask' superclass prevents @m@'s base monad to be
--- 'STM'. There is another instance where @m ~ 'STM'@, but you will need to
--- write your own instance or use 'Di.throw'' directly if @m@ is a wrapper
--- around 'STM' and not 'STM' itself. On the other hand, the 'Ex.MonadMask'
--- constraint should be easy to satisfy by all wrappers around 'IO', even those
--- that don't implement 'MonadIO'.
-instance Ex.MonadMask m => Ex.MonadThrow (DiT level path msg m) where
+-- WARNING: Note that when `m` is `STM`, or ultimately runs on 'STM', then
+-- 'Ex.throwM' *will not log* the exception, just throw it. This might change in
+-- the future if we figure out how to make it work safely.
+instance Ex.MonadThrow m => Ex.MonadThrow (DiT level path msg m) where
   throwM e = ask >>= \di -> Di.throw' natSTM di e
   {-# INLINE throwM #-}
 
--- | This instance doesn't log exceptions before throwing them.
-instance Ex.MonadThrow (DiT level path msg STM) where
-  throwM = lift . throwSTM
-  {-# INLINE throwM #-}
-
-instance (Ex.MonadThrow (DiT level path msg m), Ex.MonadCatch m)
-  => Ex.MonadCatch (DiT level path msg m) where
+instance Ex.MonadCatch m => Ex.MonadCatch (DiT level path msg m) where
   catch (DiT (ReaderT f)) = \g -> DiT (ReaderT (\x ->
     Ex.catch (f x) (\e -> let DiT (ReaderT h) = g e in h x)))
   {-# INLINE catch #-}

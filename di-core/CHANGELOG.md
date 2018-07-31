@@ -1,3 +1,12 @@
+# Version 1.0.2
+
+* The `MonadMask` superclass of `throw'` is gone.
+
+* Fix handling of async exceptions.
+
+* Add dependency on `safe-exceptions`.
+
+
 # Version 1.0.1
 
 * Added `throw'`, `throw` and `onException`.

@@ -1,11 +1,14 @@
-{ mkDerivation, base, containers, exceptions, QuickCheck, stdenv
-, stm, tasty, tasty-hunit, tasty-quickcheck, time
+{ mkDerivation, base, containers, exceptions, QuickCheck
+, safe-exceptions, stdenv, stm, tasty, tasty-hunit
+, tasty-quickcheck, time
 }:
 mkDerivation {
   pname = "di-core";
-  version = "1.0.1";
+  version = "1.0.2";
   src = ./.;
-  libraryHaskellDepends = [ base containers exceptions stm time ];
+  libraryHaskellDepends = [
+    base containers exceptions safe-exceptions stm time
+  ];
   testHaskellDepends = [
     base exceptions QuickCheck stm tasty tasty-hunit tasty-quickcheck
     time

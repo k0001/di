@@ -1,3 +1,9 @@
+# Version 1.2
+
+* The `MonadMask` constraint added in Version 1.1 is gone, effecively
+  undoing the breaking change introduced in Version 1.1.
+
+
 # Version 1.1
 
 * **BREAKING CHANGE:** The `MonadThrow` instance for `DiT level path msg

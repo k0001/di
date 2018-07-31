@@ -22,17 +22,15 @@ module Di.Core
  , Log(Log, log_time, log_level, log_path, log_message)
  ) where
 
-import Control.Concurrent (forkFinally)
+import Control.Concurrent (forkFinally, myThreadId)
 import Control.Concurrent.STM
   (STM, atomically, check, throwSTM,
    TQueue, writeTQueue, newTQueueIO, readTQueue, peekTQueue, isEmptyTQueue)
-import qualified Control.Exception as Ex
-  (BlockedIndefinitelyOnSTM, AsyncException, asyncExceptionFromException)
-import qualified Control.Monad.Catch as Ex
-import Control.Monad (when)
+import qualified Control.Exception as Ex (BlockedIndefinitelyOnSTM)
+import qualified Control.Exception.Safe as Ex
+import Control.Monad (when, void)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Foldable (foldl')
-import Data.Function (fix)
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
 import qualified Data.Time.Clock.System as Time
@@ -139,19 +137,20 @@ new
   -> m a -- ^
 new commit act = do
     tqLogs :: TQueue (Log level path msg) <- liftIO newTQueueIO
-    -- Start worker thread, restarting in in case of sync exceptions (unlikely).
-    _ <- liftIO $ fix $ \k -> forkFinally (worker tqLogs) $ \case
-       Right () -> pure () -- All messages processed and nobody cares anymore.
-       Left se -> case Ex.asyncExceptionFromException se of
-          Just (_ :: Ex.AsyncException) -> Ex.throwM se
-          Nothing -> k >> pure ()
+    -- Start worker thread. The worker thread can only ever fail with an
+    -- asynchronous exception (see `worker`). If that happens, then re-throw it
+    -- to this thread.
+    void $ liftIO $ do
+       me <- myThreadId
+       forkFinally (worker tqLogs)
+                   (either (Ex.throwTo me) pure)
     let di = Di { di_filter = \_ _ _ -> True
                 , di_send = writeTQueue tqLogs
                 , di_logex = \_ -> Just (pure ())
                 , di_flush = check =<< isEmptyTQueue tqLogs }
     -- By flushing before returning we ensure all messages are logged. This
     -- is the main reason why 'new' limits the 'Di' scope as it does.
-    Ex.finally (act di) (mute (flush di))
+    Ex.finally (act di) (flush di)
   where
     -- worker :: TQueue (Log level path msg) -> IO ()
     worker tqLogs = do
@@ -167,11 +166,15 @@ new commit act = do
             -- already should include a fallback printing mechanism, and if that
             -- fallback fails there's not much else we could do. So we just mute
             -- synchronous exceptions and move on to the next iteration.
-            muteSync (Ex.finally (commit log_) (atomically (readTQueue tqLogs)))
+            Ex.catch (Ex.finally (commit log_)
+                                 (atomically (readTQueue tqLogs)))
+                     (\(_ :: Ex.SomeException) -> pure ())
             worker tqLogs
-         Left (_ :: Ex.BlockedIndefinitelyOnSTM) -> do
+         Left (se :: Ex.SomeException) -> case Ex.fromException se of
             -- Nobody is writing to `tqLogs` anymore, we can just stop.
-            pure ()
+            Just (_ :: Ex.BlockedIndefinitelyOnSTM) -> pure ()
+            -- Some unexpected sync exception. We don't care. Continue.
+            Nothing -> worker tqLogs
 
 -- | Log a message @msg@ with a particular importance @level@.
 --
@@ -327,34 +330,27 @@ flush' nat di = nat (di_flush di)
 
 -- | This is like 'throw', but it doesn't require a 'MonadIO' constraint.
 throw'
-  :: (Ex.MonadMask m, Ex.Exception e)
+  :: (Monad m, Ex.Exception e)
   => (forall x. STM x -> m x)
   -- ^ Natural transformation from 'STM' to @m@.
   --
   -- Note that it is not necessary for this /natural transofmation/ to be a
   -- /monad morphism/ as well. That is, using 'atomically' here is acceptable.
   --
-  -- Any exception thrown by this natural transformation will be silenced, since
-  -- the passed in 'Ex.Exception' has priority.
-  --
-  -- Note that this can not be 'id' because throwing an exception from
-  -- 'STM' aborts the transaction and prevents the log message from being sent,
-  -- as is expected. This is prevented by the 'Ex.MonadMask' constraint, which
-  -- is not satisfied by 'STM'.
+  -- WARNING: Note that while this function can be 'id', calling 'throw'' from
+  -- 'STM' *will not log* the exception, just throw it. This might change in the
+  -- future if we figure out how to make it work safely.
   -> Di level path msg
   -> e  -- ^ 'Ex.Exception'.
   -> m a
-throw' nat di = \e -> Ex.mask_ $ do
-  -- If logging `e` throws a new exception, then we 'mute' it
-  -- because the original `e` exception has priority.
-  mute (nat (sequence_ (di_logex di (Ex.toException e))))
+throw' nat di = \e -> do
+  -- If logging throws an exception, then it will be propagated instead of `e`.
+  nat (sequence_ (di_logex di (Ex.toException e)))
   -- By throwing from inside 'STM' we avoid potentially entering into an
   -- infinite loop in case the implementation of 'Ex.throwM' would take us back
   -- to 'throw''. Also, notice that we need to call `nat` again here, otherwise
   -- if we were to run `throwSTM` in the same transaction as `di_logex`, the
-  -- transaction would be aborted and never be sent. The fact that we have to
-  -- run `nat` twice requires a `Ex.MonadMask` constraint as well, so that we
-  -- prevent async exceptions in between them.
+  -- transaction would be aborted and never be sent.
   nat (throwSTM e)
 {-# INLINABLE throw' #-}
 
@@ -362,16 +358,11 @@ throw' nat di = \e -> Ex.mask_ $ do
 -- rendering rules established by 'onException', and further restricted by the
 -- filtering rules established by 'filter'.
 --
--- If the exception is not logged, then this function behaves as
--- 'Ex.throwM'.
+-- If the exception is not logged, then this function behaves as 'Ex.throwM'.
 --
 -- @
 -- 'throw' ('onException' ('const' 'False') di)  ==  'Ex.throwM'
 -- @
---
--- /Note:/ Any new exception that might happen as part of the logging process is
--- silenced, so that the originally thrown exception is the one that has
--- precendence.
 throw
   :: (MonadIO m, Ex.MonadMask m, Ex.Exception e)
   => Di level path msg
@@ -582,30 +573,4 @@ data Log level path msg = Log
 getSystemTimeSTM :: STM Time.SystemTime
 {-# INLINE getSystemTimeSTM #-}
 getSystemTimeSTM = unsafeIOToSTM Time.getSystemTime
-
---------------------------------------------------------------------------------
-
--- | @'catchSync' m f@ runs @m@, and in case of /synchronous/ exceptions, calls
--- @f@ with said exception as argument. In case @m@ throwed an /asynchronous/
--- exception, then that exception is simply rethrown by 'catchSync'. Notice that
--- neither synchronous nor asynchronous exceptions thrown by @f@ are handled.
-catchSync :: Ex.MonadCatch m => m a -> (Ex.SomeException -> m a) -> m a
-{-# INLINE catchSync #-}
-catchSync m f = Ex.catch m $ \se -> case Ex.asyncExceptionFromException se of
-   Just ae -> Ex.throwM (ae :: Ex.AsyncException)
-   Nothing -> f se
-
--- | @'muteSync' m@ runs @m@, and in case of /synchronous/ exceptions, it
--- ignores them and returns @()@. In case @m@ throwed an /asynchronous/
--- exception, then that exception is simply rethrown by 'muteSync'.
-muteSync :: Ex.MonadCatch m => m () -> m ()
-{-# INLINE muteSync #-}
-muteSync m = catchSync m (\_ -> pure ())
-
--- | @'mute' m@ runs @m@, and in case of either /synchronous/ or /asynchronous/
--- exceptions, it ignores them and returns @()@. Most of the times this is not
--- what you want.
-mute :: Ex.MonadCatch m => m () -> m ()
-{-# INLINE mute #-}
-mute m = Ex.catch m (\(_ :: Ex.SomeException) -> pure ())
 
