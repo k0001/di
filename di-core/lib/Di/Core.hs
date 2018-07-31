@@ -364,7 +364,7 @@ throw' nat di = \e -> do
 -- 'throw' ('onException' ('const' 'False') di)  ==  'Ex.throwM'
 -- @
 throw
-  :: (MonadIO m, Ex.MonadMask m, Ex.Exception e)
+  :: (MonadIO m, Ex.Exception e)
   => Di level path msg
   -> e  -- ^ 'Ex.Exception'.
   -> m a
