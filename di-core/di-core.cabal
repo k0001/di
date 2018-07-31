@@ -1,5 +1,5 @@
 name: di-core
-version: 1.0.2
+version: 1.0.3
 author: Renzo Carbonara
 maintainer: renλren.zone
 copyright: Renzo Carbonara 2017-2018
@@ -21,7 +21,6 @@ library
   build-depends:
     base >=4.9 && <5.0,
     containers,
-    exceptions,
     safe-exceptions,
     stm,
     time

@@ -1,3 +1,10 @@
+# Version 1.0.3
+
+* The `MonadMask` superclass of `throw` is gone.
+
+* The `exceptions` dependency is gone.
+
+
 # Version 1.0.2
 
 * The `MonadMask` superclass of `throw'` is gone.
