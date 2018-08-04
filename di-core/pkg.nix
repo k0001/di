@@ -1,4 +1,4 @@
-{ mkDerivation, base, containers, exceptions, QuickCheck
+{ mkDerivation, async, base, containers, QuickCheck
 , safe-exceptions, stdenv, stm, tasty, tasty-hunit
 , tasty-quickcheck, time
 }:
@@ -7,11 +7,11 @@ mkDerivation {
   version = "1.0.3";
   src = ./.;
   libraryHaskellDepends = [
-    base containers safe-exceptions stm time
+    async base containers safe-exceptions stm time
   ];
   testHaskellDepends = [
-    base exceptions QuickCheck stm tasty tasty-hunit tasty-quickcheck
-    time
+    base QuickCheck safe-exceptions stm tasty tasty-hunit
+    tasty-quickcheck time
   ];
   homepage = "https://github.com/k0001/di";
   description = "Typeful hierarchical structured logging without monad towers";

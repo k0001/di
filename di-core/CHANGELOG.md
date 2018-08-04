@@ -1,8 +1,10 @@
 # Version 1.0.3
 
-* The `MonadMask` superclass of `throw` is gone.
+* Fix handling of async exceptions even more (now with tests).
 
 * The `exceptions` dependency is gone.
+
+* Added `ExceptionInLoggingWorker`.
 
 
 # Version 1.0.2

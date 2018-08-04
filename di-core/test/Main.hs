@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -6,7 +7,10 @@ module Main where
 
 import Control.Applicative ((<|>))
 import Control.Monad.IO.Class (MonadIO(liftIO))
-import qualified Control.Monad.Catch as Ex
+import Control.Concurrent (myThreadId, threadDelay)
+import qualified Control.Exception as Ex (AsyncException(UserInterrupt, ThreadKilled),
+   asyncExceptionFromException, asyncExceptionToException)
+import qualified Control.Exception.Safe as Ex
 import Control.Concurrent.STM
   (STM, atomically, retry,
    TQueue, newTQueueIO, writeTQueue, tryReadTQueue, flushTQueue)
@@ -160,7 +164,57 @@ tt = Tasty.testGroup "di-core"
        x @=? map logMeta logs
        -- Check that the timestamps are not all the same.
        2 @=? List.length (List.nub (List.sort (map Di.log_time logs)))
+
+  , HU.testCase "Exceptions: Sync in commit" $ do
+      let m = Di.new (const throwSyncException)
+                     (\(di :: Di.Di () () ()) -> do
+                          -- This delay here is to ensure the body has time
+                          -- to receive the exception from the commit.
+                          threadDelay 100000)
+      Ex.tryAny m >>= \case
+         Right () -> pure ()
+         x -> fail ("Got " ++ show x)
+
+  , HU.testCase "Exceptions: Sync in body" $ do
+      let m = Di.new (const (pure ()))
+                     (const throwSyncException)
+      Ex.tryAny m >>= \case
+         Left se | Ex.fromException se == Just (userError "foo") -> pure ()
+         x -> fail ("Got " ++ show x)
+
+  , HU.testCase "Exceptions: Async in commit" $ do
+      let m = Di.new (const throwAsyncException)
+                     (\(di :: Di.Di () () ()) -> do
+                          Di.log di () ()
+                          -- This delay here is to ensure the body has time
+                          -- to receive the exception from the commit.
+                          threadDelay 100000)
+      Ex.tryAsync m >>= \case
+         Left (se :: Ex.SomeException) ->
+            case Ex.asyncExceptionFromException se of
+               Just (Di.ExceptionInLoggingWorker se')
+                  | Ex.asyncExceptionFromException se'
+                      == Just (userError "bar") -> pure ()
+               x -> fail ("Got " ++ show x)
+         x -> fail ("Got " ++ show x)
+
+  , HU.testCase "Exceptions: Async in body" $ do
+      let m = Di.new (const (pure ()))
+                     (const throwAsyncException)
+      Ex.tryAsync m >>= \case
+         Left (se :: Ex.SomeException)
+           | Ex.asyncExceptionFromException se
+                == Just (userError "bar") -> pure ()
+         x -> fail ("Got " ++ show x)
   ]
+
+throwSyncException :: Ex.MonadThrow m => m ()
+throwSyncException = Ex.throwM (userError "foo")
+
+throwAsyncException :: MonadIO m => m ()
+throwAsyncException = liftIO $ do
+  me <- myThreadId
+  Ex.throwTo me (Ex.asyncExceptionToException (userError "bar"))
 
 --------------------------------------------------------------------------------
 
@@ -169,7 +223,7 @@ withInMemoryDi
   => (Di.Di level path msg -> m a)
   -> m ([Di.Log level path msg], a)
 withInMemoryDi k = do
-  tq :: TQueue (Di.Log level path msg) <- liftIO newTQueueIO
+  tq <- liftIO newTQueueIO
   a <- Di.new (atomically . writeTQueue tq) k
   logs <- liftIO (atomically (flushTQueue tq))
   pure (logs, a)

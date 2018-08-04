@@ -34,9 +34,9 @@ test-suite test
   main-is: Main.hs
   build-depends:
     base,
-    exceptions,
     di-core,
     QuickCheck,
+    safe-exceptions,
     stm,
     time,
     tasty,

@@ -237,7 +237,7 @@ runDiT' h = \di -> \(DiT (ReaderT f)) -> f (di, H h)
 {-# INLINE runDiT' #-}
 
 -- | Lift a monad morphism from @m@ to @n@ to a monad morphism from
--- @'DiT' level path msg m@ to @'DiT' n@.
+-- @'DiT' level path msg m@ to @'DiT' level path msg n@.
 --
 -- Notice that 'DiT' itself is not a functor in the category of monads,
 -- so it can't be an instance of 'Control.Monad.Morph.MFunctor' from the
