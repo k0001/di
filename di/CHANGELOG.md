@@ -1,3 +1,8 @@
+# Version 1.1.
+
+* Documentation improvements.
+
+
 # Version 1.1
 
 * **BREAKING CHANGE:** Exceptions are now logged _at the throw site_ by
