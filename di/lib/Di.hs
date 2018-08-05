@@ -141,6 +141,8 @@ import qualified Di.Monad
 --                    'Di.Df1.Monad.push' "handler" $ do
 --                       'Di.Df1.Monad.attr' "client-address" clientAddress $ do
 --                          'Di.Df1.Monad.info' "Connection established"
+--                          -- /If you throw an exception with 'Ex.throwM', it/
+--                          -- /will be logged automatically./
 --                          'Ex.throwM' ('userError' "Oops!")
 -- @
 --
@@ -170,11 +172,8 @@ new
   -- all logs have finished processing, before returning.
   --
   -- /WARNING:/ Even while @'new' commit 'pure' :: m ('Di.Core.Di' 'Df1.Level'
-  -- 'Df1.Path' 'Df1.Message')@ type-checks, and you can use it to work with the
-  -- 'Di.Core.Di' outside the intended scope, you will have to remember to call
-  -- 'Di.Monad.flush' yourself before exiting your application. Otherwise, some
-  -- log messages may be left unprocessed. If possible, use the 'Di.Core.Di'
-  -- within this function and don't let it escape this scope.
+  -- 'Df1.Path' 'Df1.Message')@ type-checks, attempting to use the obtained 'Di'
+  -- outside its intended scope will fail.
   -> m a -- ^
 new act = do
   commit <- Di.Handle.stderr Di.Df1.df1

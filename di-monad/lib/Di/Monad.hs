@@ -528,10 +528,7 @@ instance MonadDi level path msg m => MonadDi level path msg (P.ListT m) where
 -- will synchronously get 'Di.ExceptionInLoggingWorker' here, but by the time
 -- that happens, that same exception will have already already been thrown
 -- asynchronously to this same thread anyway, so unless you did something funny
--- to recover from that exception, you will have died already. This function
--- runs with asynchronous exceptions unmasked. *TL;DR:* In practical terms,
--- this means that you should just call 'log'' without worrying about it ever
--- throwing exceptions.
+-- to recover from that exception, you will have died already.
 log :: MonadDi level path msg m => level -> msg -> m ()
 log l = \m -> ask >>= \di -> Di.log' natSTM di l m
 {-# INLINE log #-}
