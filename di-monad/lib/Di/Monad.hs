@@ -325,6 +325,10 @@ instance MonadReader r m => MonadReader r (DiT level path msg m) where
 -- rules established by 'onException', and further restricted by the rules
 -- established by 'filter'.
 --
+-- If the exception doesn't need to be logged, according to the policy set with
+-- 'onException', then this function behaves as 'Ex.throwM' from the underlying
+-- monad.
+--
 -- WARNING: Note that when `m` is `STM`, or ultimately runs on 'STM', then
 -- 'Ex.throwM' *will not log* the exception, just throw it. This might change in
 -- the future if we figure out how to make it work safely.
@@ -516,15 +520,18 @@ instance MonadDi level path msg m => MonadDi level path msg (P.ListT m) where
 -- time when this 'log' function was called, rather than the time when the log
 -- message is printed in the future.
 --
--- /Note regarding exceptions:/ Any exception thrown by 'natSTM' will be
--- thrown here. /Synchronous/ exceptions that happen due to failures in the
--- actual committing of the log message are handled by attempting to log the
--- message to 'IO.stderr' as a fallback if possible. /Asynchronous/ exceptions
--- happening as part of the committing process will be thrown in a different
--- thread, and are not not explicitly handled. /Pure/ exceptions originating
--- from the 'filter' function will be thrown here. In practical terms, this
--- means that unless you know what you are doing, you should just call 'log''
--- without worrying about it ever throwing exceptions.
+-- /Note regarding exceptions:/ Any exception thrown by 'natSTM' will be thrown
+-- here. /Synchronous/ exceptions that happen due to failures in the actual
+-- committing of the log message, which itself is performed in a different
+-- thread, are ignored (they should be handled in the function passed to 'new'
+-- instead). If an asynchronous exception kills the logging thread, then you
+-- will synchronously get 'Di.ExceptionInLoggingWorker' here, but by the time
+-- that happens, that same exception will have already already been thrown
+-- asynchronously to this same thread anyway, so unless you did something funny
+-- to recover from that exception, you will have died already. This function
+-- runs with asynchronous exceptions unmasked. *TL;DR:* In practical terms,
+-- this means that you should just call 'log'' without worrying about it ever
+-- throwing exceptions.
 log :: MonadDi level path msg m => level -> msg -> m ()
 log l = \m -> ask >>= \di -> Di.log' natSTM di l m
 {-# INLINE log #-}
@@ -537,6 +544,9 @@ log l = \m -> ask >>= \di -> Di.log' natSTM di l m
 -- asynchronously, meaning there might be log messages still waiting to be
 -- processed. A call to 'flush' will block until all pending log messages have
 -- been processed.
+--
+-- Please see 'log' to understand how exceptions behave in this function (hint:
+-- they behave unsurprisingly).
 flush :: MonadDi level path msg m => m ()
 flush = Di.flush' natSTM =<< ask
 {-# INLINABLE flush #-}
