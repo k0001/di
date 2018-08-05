@@ -6,6 +6,7 @@
 module Main where
 
 import Control.Applicative ((<|>))
+import Control.Monad (void, (>=>))
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Control.Concurrent (myThreadId, threadDelay)
 import qualified Control.Exception as Ex (AsyncException(UserInterrupt, ThreadKilled),
@@ -165,6 +166,30 @@ tt = Tasty.testGroup "di-core"
        -- Check that the timestamps are not all the same.
        2 @=? List.length (List.nub (List.sort (map Di.log_time logs)))
 
+  , HU.testCase "onExceptions: sync logging" $ do
+      let x = [(0::Int, ([] :: [Int]),"foo")]
+      expect x $ \di0 -> do
+         let di1 = Di.onException
+                      (Ex.fromException >=> \(MyError x) -> Just (0, [], x)) di0
+         Ex.try (Di.throw di1 (MyError "foo")) >>= \case
+            Left (MyError "foo") -> pure ()
+            Right () -> error "got ()"
+
+  , HU.testCase "onExceptions: async(ish) logging" $ do
+      -- We would use throwTo ideally, but that would skip logging. This mostly
+      -- checks that a SomeAsyncException wrapper doesn't change things.
+      let x = [(0::Int, ([] :: [Int]),"foo")]
+      expect x $ \di0 -> do
+         let di1 = Di.onException
+                      (Ex.asyncExceptionFromException
+                          >=> \(MyError x) -> Just (0, [], x)) di0
+         me <- myThreadId
+         Ex.tryAsync (Di.throw di1 (Ex.asyncExceptionToException (MyError "foo")))
+            >>= \case Left se | Ex.asyncExceptionFromException se
+                                   == Just (MyError "foo") -> pure ()
+                              | otherwise -> error ("got " ++ show se)
+                      Right () -> error "got ()"
+
   , HU.testCase "Exceptions: Sync in commit" $ do
       let m = Di.new (const throwSyncException)
                      (\(di :: Di.Di () () ()) -> do
@@ -269,3 +294,5 @@ instance QC.Arbitrary Time.SystemTime where
     b <- QC.choose (0, 1000000000)
     pure (Time.MkSystemTime a b)
 
+data MyError = MyError !String deriving (Eq, Show)
+instance Ex.Exception MyError

@@ -6,6 +6,8 @@
 
 * Added `ExceptionInLoggingWorker`.
 
+* Documentation improvements.
+
 
 # Version 1.0.2
 

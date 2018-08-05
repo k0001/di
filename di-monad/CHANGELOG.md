@@ -1,3 +1,8 @@
+# Version 1.2.1
+
+* Documentation improvements.
+
+
 # Version 1.2
 
 * The `MonadMask` constraint added in Version 1.1 is gone, effecively
