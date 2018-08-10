@@ -50,13 +50,6 @@ data Log = Log
 -- @
 -- \"foo\" :: 'Message'
 -- @
---
--- Please keep in mind that 'Message' will always strip surrounding whitespace.
--- That is:
---
--- @
--- \"x\" :: 'Message'  ==  \" x\"  == \"x \" == \" x \"
--- @
 newtype Message = Message TL.Text
   deriving (Eq, Show)
 
@@ -168,13 +161,6 @@ instance Monoid Segment where
 -- @
 --
 -- Otherwise, you can use 'fromString' or the 'key' function.
---
--- Please keep in mind that 'Key' will always strip surrounding whitespace.
--- That is:
---
--- @
--- \"x\" :: 'Key'  ==  \" x\"  == \"x \" == \" x \"
--- @
 newtype Key = Key T.Text
   deriving (Eq, Show)
 
@@ -212,13 +198,6 @@ instance Monoid Key where
 -- @
 --
 -- Otherwise, you can use 'fromString' or the 'value' function.
---
--- Please keep in mind that 'value' will always strip surrounding whitespace.
--- That is:
---
--- @
--- \"x\" :: 'Value'  ==  \" x\"  == \"x \" == \" x \"
--- @
 newtype Value = Value TL.Text
   deriving (Eq, Show)
 
