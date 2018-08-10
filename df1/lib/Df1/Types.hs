@@ -61,7 +61,7 @@ newtype Message = Message TL.Text
   deriving (Eq, Show)
 
 message :: TL.Text -> Message
-message = Message . TL.dropAround (== ' ')
+message = Message
 {-# INLINE message #-}
 
 unMessage :: Message -> TL.Text
@@ -179,7 +179,7 @@ newtype Key = Key T.Text
   deriving (Eq, Show)
 
 key :: T.Text -> Key
-key = Key . T.dropAround (== ' ')
+key = Key
 {-# INLINE key #-}
 
 unKey :: Key -> T.Text
@@ -227,7 +227,7 @@ unValue = \(Value x) -> x
 {-# INLINE unValue #-}
 
 value :: TL.Text -> Value
-value = Value . TL.dropAround (== ' ')
+value = Value
 {-# INLINE value #-}
 
 instance IsString Value where
