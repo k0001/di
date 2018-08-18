@@ -13,6 +13,8 @@
   change is mostly to make the API less surprising to users: Lazy `Text` is used
   throughout.
 
+* Added draft BNF specification.
+
 
 # Version 0.1.2
 

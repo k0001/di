@@ -29,13 +29,13 @@ main = Tasty.defaultMainWithIngredients
 
 tt :: Tasty.TestTree
 tt = Tasty.testGroup "df1"
-  [ Tasty.localOption (QC.QuickCheckTests 1000) $
+  [ Tasty.localOption (QC.QuickCheckTests 2000) $
     QC.testProperty "Render/Parse roundtrip" $ do
       QC.forAllShrink QC.arbitrary QC.shrink $ \log0 -> do
          let bl = BB.toLazyByteString (Df1.render log0)
          Right log0 === ABL.eitherResult (ABL.parse Df1.parse bl)
 
-  , Tasty.localOption (QC.QuickCheckTests 1000) $
+  , Tasty.localOption (QC.QuickCheckTests 2000) $
     QC.testProperty "Color renders the same content" $ do
       QC.forAllShrink QC.arbitrary QC.shrink $ \log0 -> do
          let bl = BB.toLazyByteString (Df1.render log0)

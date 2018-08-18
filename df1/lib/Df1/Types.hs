@@ -50,7 +50,10 @@ data Log = Log
 -- \"foo\" :: 'Message'
 -- @
 --
--- Otherwise, you can use 'fromString' or the 'message' constructor.
+-- Otherwise, you can use 'fromString' or the 'message' function.
+--
+-- Notice that @\"\" :: 'Message'@ is acceptable, and will be correctly rendered
+-- and parsed back.
 newtype Message = Message TL.Text
   deriving (Eq, Show)
 
@@ -124,7 +127,10 @@ deriving instance Ord Level
 -- \"foo\" :: 'Segment'
 -- @
 --
--- Otherwise, you can use 'fromString' or the 'segment' constructor
+-- Otherwise, you can use 'fromString' or the 'segment' function.
+--
+-- Notice that @\"\" :: 'Segment'@ is acceptable, and will be correctly rendered
+-- and parsed back.
 newtype Segment = Segment TL.Text
   deriving (Eq, Show)
 
@@ -161,7 +167,10 @@ instance Monoid Segment where
 -- \"foo\" :: 'Key'
 -- @
 --
--- Otherwise, you can use 'fromString' or the 'key' constructor
+-- Otherwise, you can use 'fromString' or the 'key' function.
+--
+-- Notice that @\"\" :: 'Key'@ is acceptable, and will be correctly rendered and
+-- parsed back.
 newtype Key = Key TL.Text
   deriving (Eq, Show)
 
@@ -198,7 +207,10 @@ instance Monoid Key where
 -- \"foo\" :: 'Value'
 -- @
 --
--- Otherwise, you can use 'fromString' or the 'value' constructor.
+-- Otherwise, you can use 'fromString' or the 'value' function.
+--
+-- Notice that @\"\" :: 'Value'@ is acceptable, and will be correctly rendered
+-- and parsed back.
 newtype Value = Value TL.Text
   deriving (Eq, Show)
 
@@ -231,7 +243,7 @@ instance Monoid Value where
 -- For example, consider a /df1/ log line as like the following:
 --
 -- @
--- 1999-12-20T07:11:39.230553031Z \/foo x=a y=b \/qux z=c z=d WARNING Something
+-- 1999-12-20T07:11:39.230553031Z \/foo x=a y=b \/bar \/qux z=c z=d WARNING Something
 -- @
 --
 -- For that line, the 'log_path' attribute of the 'Log' datatype will contain
@@ -241,6 +253,7 @@ instance Monoid Value where
 -- [ 'Push' ('segment' \"foo\")
 -- , 'Attr' ('key' \"x\") ('value' \"a\")
 -- , 'Attr' ('key' \"y\") ('value' \"b\")
+-- , 'Push' ('segment' \"bar\")
 -- , 'Push' ('segment' \"qux\")
 -- , 'Attr' ('key' \"z\") ('value' \"c\")
 -- , 'Attr' ('key' \"z\") ('value' \"d\")
