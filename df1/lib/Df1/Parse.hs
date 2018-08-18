@@ -36,10 +36,10 @@ import Df1.Types
 parse :: AB.Parser Log
 {-# INLINABLE parse #-}
 parse = (AB.<?> "parse") $ do
-  t <- AB.skipWhile (== 32) *> pIso8601
+  t <- AB.skipWhile (== 32) *> pIso8601 -- :space:
   p <- AB.skipWhile (== 32) *> pPath
   l <- AB.skipWhile (== 32) *> pLevel
-  m <- AB.skipWhile (== 32) *> pMessage
+  m <- AB.skip (== 32) *> pMessage
   pure (Log { log_time = Time.utcToSystemTime t
             , log_level = l, log_path = p, log_message = m })
 
@@ -132,7 +132,6 @@ pSegment = (AB.<?> "pSegment") $ do
 
 pKey :: AB.Parser Key
 pKey = (AB.<?> "pKey") $ do
-
   bl <- pUtf8LtoL =<< pDecodePercents
           =<< AB.takeWhile (\w -> w /= 61 && w /= 32) -- '=' or :space:
   pure (key (TL.toStrict bl))
