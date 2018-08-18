@@ -128,13 +128,13 @@ pSegment :: AB.Parser Segment
 pSegment = (AB.<?> "pSegment") $ do
   AB.skip (== 47) AB.<?> "/"
   bl <- pUtf8LtoL =<< pDecodePercents =<< AB.takeWhile (/= 32) -- :space:
-  pure (segment (TL.toStrict bl))
+  pure (segment bl)
 
 pKey :: AB.Parser Key
 pKey = (AB.<?> "pKey") $ do
   bl <- pUtf8LtoL =<< pDecodePercents
           =<< AB.takeWhile (\w -> w /= 61 && w /= 32) -- '=' or :space:
-  pure (key (TL.toStrict bl))
+  pure (key bl)
 
 pValue :: AB.Parser Value
 pValue = (AB.<?> "pValue") $ do

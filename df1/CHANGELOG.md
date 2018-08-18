@@ -1,9 +1,17 @@
 # Version 0.2
 
-* BREAKING CHANGE: `Key`, `Value` and `Message` don't strip surrounding
-  whitespace anymore. When rendering `Key` and `Value`, the whitespace
-  will be percent-encoded. When rendering `Message`, the whitespace will
-  be kept as is.
+* BREAKING CHANGE: `Segment`, `Key`, `Value` and `Message` don't strip
+  surrounding whitespace anymore. When rendering `Segment`, `Key` and `Value`,
+  the whitespace will be percent-encoded. When rendering `Message`, the
+  whitespace will be kept as is.
+
+* BREAKING CHANGE: `Segment` and `Key` now wrap lazy `Text`, rather than strict
+  `Text`. This is to align their APIs with `Value` and `Message`, which already
+  wrapped lazy `Text` so as to prevent logged `Value`s and `Message`s from
+  to use much memory. It's unlikely that `Segment`s and `Key`s are affected by
+  this, since in practice they are almost always created statically. So, this
+  change is mostly to make the API less surprising to users: Lazy `Text` is used
+  throughout.
 
 
 # Version 0.1.2

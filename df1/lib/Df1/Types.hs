@@ -12,7 +12,6 @@ module Df1.Types
 
 import Data.Semigroup (Semigroup((<>)))
 import Data.Sequence as Seq
-import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
 import Data.String (IsString(fromString))
 import qualified Data.Time.Clock.System as Time
@@ -50,6 +49,8 @@ data Log = Log
 -- @
 -- \"foo\" :: 'Message'
 -- @
+--
+-- Otherwise, you can use 'fromString' or the 'message' constructor.
 newtype Message = Message TL.Text
   deriving (Eq, Show)
 
@@ -123,20 +124,20 @@ deriving instance Ord Level
 -- \"foo\" :: 'Segment'
 -- @
 --
--- Otherwise, you can use 'fromString' or the 'Segment' constructor directly.
-newtype Segment = Segment T.Text
+-- Otherwise, you can use 'fromString' or the 'segment' constructor
+newtype Segment = Segment TL.Text
   deriving (Eq, Show)
 
-segment :: T.Text -> Segment
-segment = Segment . T.dropAround (== ' ')
+segment :: TL.Text -> Segment
+segment = Segment
 {-# INLINE segment #-}
 
-unSegment :: Segment -> T.Text
+unSegment :: Segment -> TL.Text
 unSegment = \(Segment x) -> x
 {-# INLINE unSegment #-}
 
 instance IsString Segment where
-  fromString = segment . T.pack
+  fromString = segment . TL.pack
   {-# INLINE fromString #-}
 
 instance Semigroup Segment where
@@ -160,20 +161,20 @@ instance Monoid Segment where
 -- \"foo\" :: 'Key'
 -- @
 --
--- Otherwise, you can use 'fromString' or the 'key' function.
-newtype Key = Key T.Text
+-- Otherwise, you can use 'fromString' or the 'key' constructor
+newtype Key = Key TL.Text
   deriving (Eq, Show)
 
-key :: T.Text -> Key
+key :: TL.Text -> Key
 key = Key
 {-# INLINE key #-}
 
-unKey :: Key -> T.Text
+unKey :: Key -> TL.Text
 unKey = \(Key x) -> x
 {-# INLINE unKey #-}
 
 instance IsString Key where
-  fromString = key . T.pack
+  fromString = key . TL.pack
   {-# INLINE fromString #-}
 
 instance Semigroup Key where
@@ -197,7 +198,7 @@ instance Monoid Key where
 -- \"foo\" :: 'Value'
 -- @
 --
--- Otherwise, you can use 'fromString' or the 'value' function.
+-- Otherwise, you can use 'fromString' or the 'value' constructor.
 newtype Value = Value TL.Text
   deriving (Eq, Show)
 

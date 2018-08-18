@@ -14,6 +14,7 @@ import Data.Monoid ((<>))
 import qualified Data.Sequence as Seq
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
+import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as TL
 import qualified Data.Time as Time
 import qualified Data.Time.Clock.System as Time
@@ -111,7 +112,7 @@ renderMessage x = eall (unMessage x)
 -- * A 'isControl7' char anywhere is always percent-escaped.
 renderSegment :: Segment -> BB.Builder
 {-# INLINE renderSegment #-}
-renderSegment x = case T.uncons (unSegment x) of
+renderSegment x = case TL.uncons (unSegment x) of
     Nothing -> mempty
     Just (hd,tl) -> ehead (T.singleton hd) <> etail tl
   where
@@ -121,7 +122,7 @@ renderSegment x = case T.uncons (unSegment x) of
       $ BBP.condB isControl7 word8HexPercent
       $ BBP.liftFixedToBounded BBP.word8
     {-# INLINE etail #-}
-    etail = T.encodeUtf8BuilderEscaped
+    etail = TL.encodeUtf8BuilderEscaped
       $ BBP.condB (\w -> w == 0x2d    -- '-'
                       || w == 0x5f)   -- '_'
                   (BBP.liftFixedToBounded BBP.word8)
@@ -139,7 +140,7 @@ renderSegment x = case T.uncons (unSegment x) of
 --   \'-' or \'_'.
 renderKey :: Key -> BB.Builder
 {-# INLINE renderKey #-}
-renderKey x = case T.uncons (unKey x) of
+renderKey x = case TL.uncons (unKey x) of
     Nothing -> mempty
     Just (hd,tl) -> ehead (T.singleton hd) <> etail tl
   where
@@ -149,7 +150,7 @@ renderKey x = case T.uncons (unKey x) of
       $ BBP.condB isControl7 word8HexPercent
       $ BBP.liftFixedToBounded BBP.word8
     {-# INLINE etail #-}
-    etail = T.encodeUtf8BuilderEscaped
+    etail = TL.encodeUtf8BuilderEscaped
       $ BBP.condB (\w -> w == 0x2d    -- '-'
                       || w == 0x5f)   -- '_'
                   (BBP.liftFixedToBounded BBP.word8)
