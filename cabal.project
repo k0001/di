@@ -1,3 +1,6 @@
+documentation: True
+tests: True
+jobs: $ncpus
 packages:
   df1/
   di/
