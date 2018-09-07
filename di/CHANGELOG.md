@@ -1,7 +1,9 @@
-# Version 1.1.
+# Version 1.1.1
 
 * Documentation improvements.
 
+* Re-export `Df1.ToSegment`, `Df1.segment`, `Df1.ToMessage`, `Df1.message`,
+  `Df1.ToKey`, `Df1.key`, `Df1.ToValue`, `Df1.value`.
 
 # Version 1.1
 

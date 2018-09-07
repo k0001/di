@@ -61,27 +61,19 @@ instance QC.Arbitrary Df1.Level where
 
 instance QC.Arbitrary Df1.Segment where
   arbitrary = fromString <$> QC.arbitrary
-  shrink = map Df1.segment . QC.shrink . Df1.unSegment
+  shrink = map fromString . QC.shrink . TL.unpack . Df1.unSegment
 
 instance QC.Arbitrary Df1.Key where
   arbitrary = fromString <$> QC.arbitrary
-  shrink = map Df1.key . QC.shrink . Df1.unKey
+  shrink = map fromString . QC.shrink . TL.unpack . Df1.unKey
 
 instance QC.Arbitrary Df1.Value where
   arbitrary = fromString <$> QC.arbitrary
-  shrink = map Df1.value . QC.shrink . Df1.unValue
+  shrink = map fromString . QC.shrink . TL.unpack . Df1.unValue
 
 instance QC.Arbitrary Df1.Message where
   arbitrary = fromString <$> QC.arbitrary
-  shrink = map Df1.message . QC.shrink . Df1.unMessage
-
-instance QC.Arbitrary T.Text where
-  arbitrary = T.pack <$> QC.arbitrary
-  shrink = map T.pack . QC.shrink . T.unpack
-
-instance QC.Arbitrary TL.Text where
-  arbitrary = TL.pack <$> QC.arbitrary
-  shrink = map TL.pack . QC.shrink . TL.unpack
+  shrink = map fromString . QC.shrink . TL.unpack . Df1.unMessage
 
 genSystemTime :: QC.Gen Time.SystemTime
 genSystemTime = do

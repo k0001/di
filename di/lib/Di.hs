@@ -72,18 +72,19 @@ module Di
  , Di.Df1.Monad.push
  , Df1.Path
  , Df1.Segment
- , Df1.segment
+ , Df1.ToSegment(segment)
 
    -- ** Metadata
  , Di.Df1.Monad.attr
  , Df1.Key
- , Df1.key
+ , Df1.ToKey(key)
  , Df1.Value
- , Df1.value
+ , Df1.ToValue(value)
 
    -- ** Messages
  , Df1.Level
  , Df1.Message
+ , Df1.ToMessage(message)
  , Di.Df1.Monad.debug
  , Di.Df1.Monad.info
  , Di.Df1.Monad.notice

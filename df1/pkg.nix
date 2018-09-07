@@ -3,7 +3,7 @@
 }:
 mkDerivation {
   pname = "df1";
-  version = "0.2";
+  version = "0.3";
   src = ./.;
   libraryHaskellDepends = [
     attoparsec base bytestring containers text time

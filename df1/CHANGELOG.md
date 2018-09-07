@@ -1,3 +1,11 @@
+# Version 0.3
+
+* The `segment`, `key`, `value` and `message` functions are now methods of the
+  new `ToSegment`, `ToKey`, `ToValue` and `ToMessage` classes.  Identity
+  instances, as well as instances for `String`, lazy `Text` and strict `Text`,
+  have been introduced for these classes.
+
+
 # Version 0.2
 
 * BREAKING CHANGE: `Segment`, `Key`, `Value` and `Message` don't strip

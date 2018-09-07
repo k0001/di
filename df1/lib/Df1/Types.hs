@@ -1,17 +1,20 @@
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 
 module Df1.Types
  ( Log(Log, log_time, log_level, log_path, log_message)
  , Level(Debug, Info, Notice, Warning, Error, Critical, Alert, Emergency)
  , Path(Attr, Push)
- , Segment, unSegment, segment
- , Key, unKey, key
- , Value, unValue, value
- , Message, unMessage, message
+ , Segment, unSegment, ToSegment(segment)
+ , Key, unKey, ToKey(key)
+ , Value, unValue, ToValue(value)
+ , Message, unMessage, ToMessage(message)
  ) where
 
 import Data.Semigroup (Semigroup((<>)))
 import Data.Sequence as Seq
+import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
 import Data.String (IsString(fromString))
 import qualified Data.Time.Clock.System as Time
@@ -50,23 +53,19 @@ data Log = Log
 -- \"foo\" :: 'Message'
 -- @
 --
--- Otherwise, you can use 'fromString' or the 'message' function.
+-- Otherwise, you can use 'fromString' or 'message'.
 --
 -- Notice that @\"\" :: 'Message'@ is acceptable, and will be correctly rendered
 -- and parsed back.
 newtype Message = Message TL.Text
   deriving (Eq, Show)
 
-message :: TL.Text -> Message
-message = Message
-{-# INLINE message #-}
-
 unMessage :: Message -> TL.Text
 unMessage = \(Message x) -> x
 {-# INLINE unMessage #-}
 
 instance IsString Message where
-  fromString = message . TL.pack
+  fromString = message
   {-# INLINE fromString #-}
 
 instance Semigroup Message where
@@ -78,6 +77,46 @@ instance Monoid Message where
   {-# INLINE mempty #-}
   mappend (Message a) (Message b) = Message (mappend a b)
   {-# INLINE mappend #-}
+
+-- | Convert an arbitrary type to a 'Message'.
+--
+-- You are encouraged to create custom 'ToMessage' instances for your types
+-- making sure you avoid rendering sensitive details such as passwords, so that
+-- they don't accidentally end up in logs.
+--
+-- Any characters that need to be escaped for rendering will be automatically
+-- escaped at rendering time. You don't need to escape them here.
+class ToMessage a where
+  message :: a -> Message
+
+-- | Identity.
+instance ToMessage Message where
+  message = id
+  {-# INLINE message #-}
+
+-- |
+-- @
+-- x :: 'TL.Text' == 'unMessage' ('message' x)
+-- @
+instance ToMessage TL.Text where
+  message = Message
+  {-# INLINE message #-}
+
+-- |
+-- @
+-- x :: 'T.Text' == 'TL.toStrict' ('unMessage' ('message' x))
+-- @
+instance ToMessage T.Text where
+  message = Message . TL.fromStrict
+  {-# INLINE message #-}
+
+-- |
+-- @
+-- x :: 'String' == 'TL.unpack' ('unMessage' ('message' x))
+-- @
+instance ToMessage String where
+  message = Message . TL.pack
+  {-# INLINE message #-}
 
 --------------------------------------------------------------------------------
 
@@ -127,23 +166,19 @@ deriving instance Ord Level
 -- \"foo\" :: 'Segment'
 -- @
 --
--- Otherwise, you can use 'fromString' or the 'segment' function.
+-- Otherwise, you can use 'fromString' or 'segment'.
 --
 -- Notice that @\"\" :: 'Segment'@ is acceptable, and will be correctly rendered
 -- and parsed back.
 newtype Segment = Segment TL.Text
   deriving (Eq, Show)
 
-segment :: TL.Text -> Segment
-segment = Segment
-{-# INLINE segment #-}
-
 unSegment :: Segment -> TL.Text
 unSegment = \(Segment x) -> x
 {-# INLINE unSegment #-}
 
 instance IsString Segment where
-  fromString = segment . TL.pack
+  fromString = segment
   {-# INLINE fromString #-}
 
 instance Semigroup Segment where
@@ -156,6 +191,46 @@ instance Monoid Segment where
   mappend (Segment a) (Segment b) = Segment (mappend a b)
   {-# INLINE mappend #-}
 
+-- | Convert an arbitrary type to a 'Segment'.
+--
+-- You are encouraged to create custom 'ToSegment' instances for your types
+-- making sure you avoid rendering sensitive details such as passwords, so that
+-- they don't accidentally end up in logs.
+--
+-- Any characters that need to be escaped for rendering will be automatically
+-- escaped at rendering time. You don't need to escape them here.
+class ToSegment a where
+  segment :: a -> Segment
+
+-- | Identity.
+instance ToSegment Segment where
+  segment = id
+  {-# INLINE segment #-}
+
+-- |
+-- @
+-- x :: 'TL.Text' == 'unSegment' ('segment' x)
+-- @
+instance ToSegment TL.Text where
+  segment = Segment
+  {-# INLINE segment #-}
+
+-- |
+-- @
+-- x :: 'T.Text' == 'TL.toStrict' ('unSegment' ('segment' x))
+-- @
+instance ToSegment T.Text where
+  segment = Segment . TL.fromStrict
+  {-# INLINE segment #-}
+
+-- |
+-- @
+-- x :: 'String' == 'TL.unpack' ('unSegment' ('segment' x))
+-- @
+instance ToSegment String where
+  segment = Segment . TL.pack
+  {-# INLINE segment #-}
+
 --------------------------------------------------------------------------------
 
 -- | An attribute key (see 'Attr').
@@ -167,23 +242,19 @@ instance Monoid Segment where
 -- \"foo\" :: 'Key'
 -- @
 --
--- Otherwise, you can use 'fromString' or the 'key' function.
+-- Otherwise, you can use 'fromString' or 'key'.
 --
 -- Notice that @\"\" :: 'Key'@ is acceptable, and will be correctly rendered and
 -- parsed back.
 newtype Key = Key TL.Text
   deriving (Eq, Show)
 
-key :: TL.Text -> Key
-key = Key
-{-# INLINE key #-}
-
 unKey :: Key -> TL.Text
 unKey = \(Key x) -> x
 {-# INLINE unKey #-}
 
 instance IsString Key where
-  fromString = key . TL.pack
+  fromString = key
   {-# INLINE fromString #-}
 
 instance Semigroup Key where
@@ -196,6 +267,46 @@ instance Monoid Key where
   mappend (Key a) (Key b) = Key (mappend a b)
   {-# INLINE mappend #-}
 
+-- | Convert an arbitrary type to a 'Key'.
+--
+-- You are encouraged to create custom 'ToKey' instances for your types
+-- making sure you avoid rendering sensitive details such as passwords, so that
+-- they don't accidentally end up in logs.
+--
+-- Any characters that need to be escaped for rendering will be automatically
+-- escaped at rendering time. You don't need to escape them here.
+class ToKey a where
+  key :: a -> Key
+
+-- | Identity.
+instance ToKey Key where
+  key = id
+  {-# INLINE key #-}
+
+-- |
+-- @
+-- x :: 'TL.Text' == 'unKey' ('key' x)
+-- @
+instance ToKey TL.Text where
+  key = Key
+  {-# INLINE key #-}
+
+-- |
+-- @
+-- x :: 'T.Text' == 'TL.toStrict' ('unKey' ('key' x))
+-- @
+instance ToKey T.Text where
+  key = Key . TL.fromStrict
+  {-# INLINE key #-}
+
+-- |
+-- @
+-- x :: 'String' == 'TL.unpack' ('unKey' ('key' x))
+-- @
+instance ToKey String where
+  key = Key . TL.pack
+  {-# INLINE key #-}
+
 --------------------------------------------------------------------------------
 
 -- | An attribute value (see 'Attr').
@@ -207,7 +318,7 @@ instance Monoid Key where
 -- \"foo\" :: 'Value'
 -- @
 --
--- Otherwise, you can use 'fromString' or the 'value' function.
+-- Otherwise, you can use 'fromString' or 'value'.
 --
 -- Notice that @\"\" :: 'Value'@ is acceptable, and will be correctly rendered
 -- and parsed back.
@@ -218,12 +329,8 @@ unValue :: Value -> TL.Text
 unValue = \(Value x) -> x
 {-# INLINE unValue #-}
 
-value :: TL.Text -> Value
-value = Value
-{-# INLINE value #-}
-
 instance IsString Value where
-  fromString = value . TL.pack
+  fromString = value
   {-# INLINE fromString #-}
 
 instance Semigroup Value where
@@ -235,6 +342,46 @@ instance Monoid Value where
   {-# INLINE mempty #-}
   mappend (Value a) (Value b) = Value (mappend a b)
   {-# INLINE mappend #-}
+
+-- | Convert an arbitrary type to a 'Value'.
+--
+-- You are encouraged to create custom 'ToValue' instances for your types
+-- making sure you avoid rendering sensitive details such as passwords, so that
+-- they don't accidentally end up in logs.
+--
+-- Any characters that need to be escaped for rendering will be automatically
+-- escaped at rendering time. You don't need to escape them here.
+class ToValue a where
+  value :: a -> Value
+
+-- | Identity.
+instance ToValue Value where
+  value = id
+  {-# INLINE value #-}
+
+-- |
+-- @
+-- x :: 'TL.Text' == 'unValue' ('value' x)
+-- @
+instance ToValue TL.Text where
+  value = Value
+  {-# INLINE value #-}
+
+-- |
+-- @
+-- x :: 'T.Text' == 'TL.toStrict' ('unValue' ('value' x))
+-- @
+instance ToValue T.Text where
+  value = Value . TL.fromStrict
+  {-# INLINE value #-}
+
+-- |
+-- @
+-- x :: 'String' == 'TL.unpack' ('unValue' ('value' x))
+-- @
+instance ToValue String where
+  value = Value . TL.pack
+  {-# INLINE value #-}
 
 --------------------------------------------------------------------------------
 

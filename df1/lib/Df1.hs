@@ -29,10 +29,10 @@ module Df1
    T.Log(Log, log_time, log_level, log_path, log_message)
  , T.Level(Debug, Info, Notice, Warning, Error, Critical, Alert, Emergency)
  , T.Path(Attr, Push)
- , T.Segment, T.unSegment, T.segment
- , T.Key, T.unKey, T.key
- , T.Value, T.unValue, T.value
- , T.Message, T.unMessage, T.message
+ , T.Segment, T.unSegment, T.ToSegment(segment)
+ , T.Key, T.unKey, T.ToKey(key)
+ , T.Value, T.unValue, T.ToValue(value)
+ , T.Message, T.unMessage, T.ToMessage(message)
    -- * Parsing
  , P.parse
    -- * Rendering
