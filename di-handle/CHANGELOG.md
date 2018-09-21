@@ -1,3 +1,8 @@
+# Version 1.0.1
+
+* Add missing compiler pragma.
+
+
 # Version 1.0
 
 * This library contains some of what was in `di-0.3`, conceptually at least.

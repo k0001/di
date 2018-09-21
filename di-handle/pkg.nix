@@ -2,7 +2,7 @@
 }:
 mkDerivation {
   pname = "di-handle";
-  version = "1.0";
+  version = "1.0.1";
   src = ./.;
   libraryHaskellDepends = [
     base bytestring di-core exceptions unix
