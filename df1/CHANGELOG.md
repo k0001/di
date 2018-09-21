@@ -1,3 +1,8 @@
+# Version 0.3.1
+
+* Added missing language pragma.
+
+
 # Version 0.3
 
 * The `segment`, `key`, `value` and `message` functions are now methods of the
