@@ -1,1 +1,1 @@
-(import ../pkgs.nix {})._here.ghc841.di-core
+(import ../pkgs.nix {})._here.ghc861.di-core
