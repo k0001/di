@@ -47,6 +47,7 @@ module Di.Monad
  , flush
  , push
  , filter
+ , throw
  , onException
 
  , -- * DiT
@@ -321,19 +322,11 @@ instance MonadReader r m => MonadReader r (DiT level path msg m) where
     DiT (ReaderT (\di -> Reader.local f (gma di)))
   {-# INLINE local #-}
 
--- | Throw an 'Ex.Exception', but not without logging it first according to the
--- rules established by 'onException', and further restricted by the rules
--- established by 'filter'.
+-- | Throw an 'Ex.Exception' from the underlying @m@, without logging it.
 --
--- If the exception doesn't need to be logged, according to the policy set with
--- 'onException', then this function behaves as 'Ex.throwM' from the underlying
--- monad.
---
--- WARNING: Note that when `m` is `STM`, or ultimately runs on 'STM', then
--- 'Ex.throwM' *will not log* the exception, just throw it. This might change in
--- the future if we figure out how to make it work safely.
+-- If you want to log the 'Ex.Exception' as you throw it, use 'throw' instead.
 instance Ex.MonadThrow m => Ex.MonadThrow (DiT level path msg m) where
-  throwM e = ask >>= \di -> Di.throw' natSTM di e
+  throwM e = DiT (ReaderT (\_ -> Ex.throwM e))
   {-# INLINE throwM #-}
 
 instance Ex.MonadCatch m => Ex.MonadCatch (DiT level path msg m) where
@@ -590,9 +583,9 @@ push :: MonadDi level path msg m => path -> m a -> m a
 push p = local (Di.push p)
 {-# INLINE push #-}
 
--- | Within the passed given @m a@, exceptions thrown with 'Ex.throwM' could
--- could be logged as a @msg@ with a particular @level@ if both the passed in
--- function returns 'Just', and 'filter' so allows it afterwards.
+-- | Within the passed given @m a@, exceptions thrown with 'throw' could could
+-- be logged as a @msg@ with a particular @level@ if both the passed in function
+-- returns 'Just', and 'filter' so allows it afterwards.
 --
 -- If the given function returns 'Nothing', then no logging is performed.
 --
@@ -616,4 +609,19 @@ onException
   -> m a
   -> m a
 onException f = local (Di.onException f)
+
+-- | Throw an 'Ex.Exception', but not without logging it first according to the
+-- rules established by 'onException', and further restricted by the rules
+-- established by 'filter'.
+--
+-- If the exception doesn't need to be logged, according to the policy set with
+-- 'onException', then this function behaves just as
+-- 'Control.Concurrent.STM.throwSTM'.
+--
+-- WARNING: Note that when `m` is `STM`, or ultimately runs on 'STM', then
+-- 'throw' /will not log/ the exception, just throw it. This might change in
+-- the future if we figure out how to make it work safely.
+throw :: (MonadDi level path msg m, Ex.Exception e) => e -> m a
+throw e = ask >>= \di -> Di.throw' natSTM di e
+{-# INLINE throw #-}
 

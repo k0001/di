@@ -94,6 +94,9 @@ module Di
  , Di.Df1.Monad.critical
  , Di.Df1.Monad.emergency
 
+   -- ** Exceptions
+ , Di.Monad.throw
+
    -- * Basic DiT support
  , Di.Df1.Monad.Df1T
  , Di.Monad.runDiT
@@ -142,9 +145,9 @@ import qualified Di.Monad
 --                    'Di.Df1.Monad.push' "handler" $ do
 --                       'Di.Df1.Monad.attr' "client-address" clientAddress $ do
 --                          'Di.Df1.Monad.info' "Connection established"
---                          -- /If you throw an exception with 'Ex.throwM', it/
---                          -- /will be logged automatically./
---                          'Ex.throwM' ('userError' "Oops!")
+--                          -- /If you throw an exception with 'Di.Monad.throw',/
+--                          -- /it will be logged automatically./
+--                          'Di.throw' ('userError' "Oops!")
 -- @
 --
 -- That program will render something like this to 'System.IO.stderr' (in colors!):
@@ -157,12 +160,12 @@ import qualified Di.Monad
 -- 2018-05-06T19:48:06.195059102Z \/server port=80 \/handler client%2daddress=192%2e168%2e0%2e25%3a32528 exception=user%20error%20(Oops!) WARNING Exception thrown
 -- @
 --
--- Notice that by default, /all/ exceptions thrown using 'Ex.throwM' or
--- 'Di.throw' are logged /at their throw site/ with 'Df1.Warning' level.
+-- Notice that by default, /all/ exceptions thrown using 'Di.Monad.throw'
+-- are logged /at their throw site/ with 'Df1.Warning' level.
 --
 -- (Unrelated: Notice how /df1/ escapes pretty much all punctuation characters.
--- This is temporal until /df1/ is formalized and a more limited set of
--- punctuation characters is reserved.)
+-- This is temporal until the /df1/ format is formalized and a more limited set
+-- of punctuation characters is reserved.)
 new
   :: (MonadIO m, Ex.MonadMask m)
   => (Di.Core.Di Df1.Level Df1.Path Df1.Message -> m a)

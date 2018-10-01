@@ -1,3 +1,14 @@
+# Version 1.2
+
+* The `MonadThrow` instance for `DiT` doesn't log exceptions automatically any
+  more. This is because otherwise catching and re-throwing exceptions in
+  downstream code, by default, ends up logging the same exception more than
+  once.
+
+* A `throw` function behaving as the previous `MonadThrow` instance was
+  introduced.
+
+
 # Version 1.1.1
 
 * Documentation improvements.
