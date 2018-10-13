@@ -1,3 +1,7 @@
+# Unreleased
+
+* Instance `MonadError e m => MonadError e (DiT level path msg m)`
+
 # Version 1.3
 
 * The `MonadThrow` instance for `DiT` doesn't log exceptions automatically any
