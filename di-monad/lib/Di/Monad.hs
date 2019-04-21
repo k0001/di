@@ -63,7 +63,7 @@ import Control.Applicative (Alternative)
 import Control.Concurrent.STM (STM, atomically)
 import qualified Control.Monad.Catch as Ex
 import Control.Monad.Cont (MonadCont, ContT(ContT))
-import Control.Monad.Except (ExceptT(ExceptT))
+import Control.Monad.Except (ExceptT(ExceptT), MonadError)
 import Control.Monad.Fail (MonadFail)
 import Control.Monad.Fix (MonadFix)
 import Control.Monad.IO.Class (MonadIO, liftIO)
@@ -111,7 +111,7 @@ newtype DiT level path msg m a
   = DiT (ReaderT (Di level path msg, H STM m) m a)
   deriving (Functor, Applicative, Alternative, Monad, MonadIO,
             MonadFail, MonadFix, MonadZip, MonadPlus, MonadCont,
-            MonadState s, MonadWriter w)
+            MonadState s, MonadWriter w, MonadError e)
 
 -- | Build a 'DiT'.
 --
