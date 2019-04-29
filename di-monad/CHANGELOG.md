@@ -1,4 +1,4 @@
-# Unreleased
+# Version 1.3.1
 
 * Instance `MonadError e m => MonadError e (DiT level path msg m)`
 
