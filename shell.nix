@@ -3,4 +3,4 @@
 # various Haskell projects in this repo are available.
 { nixpkgs ? import ./nixpkgs.nix }:
 let pkgs = import ./pkgs.nix { inherit nixpkgs; };
-in pkgs._here.ghc861._shell
+in pkgs._here.ghc864._shell

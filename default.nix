@@ -5,13 +5,13 @@ in
 pkgs.releaseTools.aggregate {
   name = "everything";
   constituents = [
-    pkgs._here.ghc861.df1
-    pkgs._here.ghc861.di
-    pkgs._here.ghc861.di-core
-    pkgs._here.ghc861.di-df1
-    pkgs._here.ghc861.di-handle
-    pkgs._here.ghc861.di-monad
-    pkgs._here.ghc861._shell
+    pkgs._here.ghc864.df1
+    pkgs._here.ghc864.di
+    pkgs._here.ghc864.di-core
+    pkgs._here.ghc864.di-df1
+    pkgs._here.ghc864.di-handle
+    pkgs._here.ghc864.di-monad
+    pkgs._here.ghc864._shell
   ];
 }
 
