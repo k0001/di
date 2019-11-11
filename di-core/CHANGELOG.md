@@ -1,3 +1,10 @@
+# Version 1.0.4
+
+* Improve exception handling when worker stops.
+
+* Added `LoggingWorkerNotRunning`.
+
+
 # Version 1.0.3
 
 * Fix handling of async exceptions even more (now with tests).

@@ -21,6 +21,7 @@ module Di.Core
  , contramsg
  , Log(Log, log_time, log_level, log_path, log_message)
  , ExceptionInLoggingWorker(ExceptionInLoggingWorker)
+ , LoggingWorkerNotRunning(LoggingWorkerNotRunning)
  ) where
 
 import Control.Concurrent (forkIOWithUnmask, myThreadId)
@@ -139,20 +140,18 @@ new
 new commit act = do
     tqLogs :: STM.TQueue (Log level path msg)
        <- liftIO STM.newTQueueIO
-    tmvWOut :: STM.TMVar (Maybe ExceptionInLoggingWorker)
+    tmvWOut :: STM.TMVar Ex.SomeException
        <- liftIO STM.newEmptyTMVarIO
     let di = Di { di_filter = \_ _ _ -> True
                 , di_logex = \_ -> Just (pure ())
                 , di_send = \x -> STM.tryReadTMVar tmvWOut >>= \case
                      Nothing -> STM.writeTQueue tqLogs x
-                     Just (Just ex) -> STM.throwSTM ex
-                     Just Nothing -> error "di_send: the impossible happened"
+                     Just ex -> STM.throwSTM ex
                 , di_flush = STM.tryReadTMVar tmvWOut >>= \case
                      Nothing -> STM.isEmptyTQueue tqLogs >>= \case
                         True -> pure ()
                         False -> STM.retry
-                     Just (Just ex) -> STM.throwSTM ex
-                     Just Nothing -> error "di_flush: the impossible happened"
+                     Just ex -> STM.throwSTM ex
                 }
     tIdMe <- liftIO myThreadId
     Ex.uninterruptibleMask $ \restore -> do
@@ -160,15 +159,16 @@ new commit act = do
        -- the main thread and save it to `tmvWOut`.
        tIdWorker <- liftIO $ forkIOWithUnmask $ \unmask -> do
           Ex.tryAsync (unmask (worker tqLogs)) >>= \case
-             Right () -> STM.atomically (STM.putTMVar tmvWOut Nothing)
+             Right () -> STM.atomically $ do
+                STM.putTMVar tmvWOut (Ex.toException LoggingWorkerNotRunning)
              Left (se :: Ex.SomeException) -> case Ex.fromException se of
-                Just MyThreadKilled -> do
-                   STM.atomically (STM.putTMVar tmvWOut Nothing)
+                Just MyThreadKilled -> STM.atomically $ do
+                   STM.putTMVar tmvWOut (Ex.toException LoggingWorkerNotRunning)
                 Nothing -> do
                    let ex = ExceptionInLoggingWorker se
                    Ex.finally
                       (Ex.throwTo tIdMe (Ex.asyncExceptionToException ex))
-                      (STM.atomically (STM.putTMVar tmvWOut (Just ex)))
+                      (STM.atomically (STM.putTMVar tmvWOut (Ex.toException ex)))
        -- Run `act`, flushing and killing the worker when we are done.
        Ex.finally
           (restore (act di))
@@ -214,6 +214,12 @@ data ExceptionInLoggingWorker
   = ExceptionInLoggingWorker !Ex.SomeException
   deriving (Show)
 instance Ex.Exception ExceptionInLoggingWorker
+
+-- | This exception is thrown if somebody tries to log or flush a message
+-- when the logging worker is not running.
+data LoggingWorkerNotRunning = LoggingWorkerNotRunning
+  deriving (Show)
+instance Ex.Exception LoggingWorkerNotRunning
 
 -- | Internal. This is our own version of 'Ex.ThreadKilled' which we use
 -- inside 'new' so that we can identify it and prevent its propagation.
