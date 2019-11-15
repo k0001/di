@@ -1,6 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE StrictData #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
@@ -76,12 +77,12 @@ import Prelude hiding (log, filter)
 -- the spanish word for an imperative form of the verb \"decir", which in
 -- english means "to say", which clearly must have something to do with logging.
 data Di level path msg = Di
-  { di_filter :: !(level -> Seq path -> msg -> Bool)
+  { di_filter :: level -> Seq path -> msg -> Bool
     -- ^ Whether a particular combination of @level@, @path@s and @msg@ should
     -- be logged.
-  , di_send :: !(Log level path msg -> STM ())
+  , di_send :: Log level path msg -> STM ()
     -- ^ Send a 'Log' for processing.
-  , di_flush :: !(STM ())
+  , di_flush :: STM ()
     -- ^ Block until all logs finish being processed.
   , di_logex :: Ex.SomeException -> Maybe (STM ())
     -- ^ If an exception deserves logging, then returns an 'STM' action
@@ -599,21 +600,21 @@ contramsg f = \di -> di
 --------------------------------------------------------------------------------
 
 data Log level path msg = Log
-  { log_time :: !Time.SystemTime
+  { log_time :: Time.SystemTime
     -- ^ First known timestamp when the log was generated.
     --
     -- We use 'Time.SystemTime' rather than 'Time.UTCTime' because it is
     -- cheaper to obtain and to render. You can use
     -- 'Data.Time.Clock.System.systemToUTCTime' to convert it if necessary.
-  , log_level :: !level
+  , log_level :: level
     -- ^ Importance level of the logged message (e.g., “info”, “warning”,
     -- “error”, etc.).
-  , log_path :: !(Seq path)
+  , log_path :: Seq path
     -- ^ Path where the logged message was created from.
     --
     -- The leftmost @path@ is the root @path@. The rightmost @path@ is the
     -- @path@ closest to where the log was generated.
-  , log_message :: !msg
+  , log_message :: msg
     -- ^ Human-readable message itself.
   } deriving (Eq, Show)
 
