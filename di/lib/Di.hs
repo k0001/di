@@ -169,7 +169,7 @@ import qualified Di.Monad
 --
 -- That program will render something like this to 'System.IO.stderr':
 --
--- ![df1 example](https://raw.githubusercontent.com/k0001/di/master/df1/df1.png)
+-- ![df1 example](https://raw.githubusercontent.com/k0001/di/df1-0.3.2/df1/df1.png)
 --
 --
 -- You get the nice colors only if the output is going to a TTY.
