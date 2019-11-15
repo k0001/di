@@ -1,8 +1,8 @@
 name: di
-version: 1.2
+version: 1.2.1
 author: Renzo Carbonara
 maintainer: renλren.zone
-copyright: Renzo Carbonara 2017-2018
+copyright: Renzo Carbonara 2017
 license: BSD3
 license-file: LICENSE.txt
 extra-source-files: README.md CHANGELOG.md
@@ -13,11 +13,15 @@ synopsis: Typeful hierarchical structured logging using di, mtl and df1.
 description:
   Typeful hierarchical structured logging using di, mtl and df1.
   .
-  This is meta-package bringing in together things from the
-  [di-core](https://hackage.haskell.org/package/di-core),
-  [di-monad](https://hackage.haskell.org/package/di-monad),
-  [di-handle](https://hackage.haskell.org/package/di-handle) and
-  [di-df1](https://hackage.haskell.org/package/di-df1) libraries.
+  This is meta-package bringing in together things from:
+  .
+  * [di-core](https://hackage.haskell.org/package/di-core)
+  .
+  * [di-monad](https://hackage.haskell.org/package/di-monad)
+  .
+  * [di-handle](https://hackage.haskell.org/package/di-handle)
+  .
+  * [di-df1](https://hackage.haskell.org/package/di-df1)
   .
   See the "Di" module for more documentation.
 homepage: https://github.com/k0001/di

@@ -81,6 +81,16 @@ module Di
  , Di.Df1.Monad.alert
  , Di.Df1.Monad.critical
  , Di.Df1.Monad.emergency
+   -- ** Better type-inference
+ , Di.Df1.Monad.debug'
+ , Di.Df1.Monad.info'
+ , Di.Df1.Monad.notice'
+ , Di.Df1.Monad.warning'
+ , Di.Df1.Monad.error'
+ , Di.Df1.Monad.alert'
+ , Di.Df1.Monad.critical'
+ , Di.Df1.Monad.emergency'
+
    -- * Exceptions
  , Di.Monad.throw
 
@@ -124,46 +134,61 @@ import qualified Di.Monad
 -- @
 -- main :: 'IO' ()
 -- main = do
---    'new' $ \\di -> do
---       -- /The rest of your program goes here./
---       -- /You can start logging right away./
+--    -- First you obtain a 'Di.Core.Di'.
+--    -- You do this once per application, in `main`.
+--    new $ \\di -> do
+--       -- You can start logging right away by acting
+--       -- on the on the 'Di.Core.Di' object, but here
+--       -- we encourage using 'Di.Monad.runDiT' and perforfing
+--       -- all your logging from within a 'Di.Df1.Monad.MonadDf1'.
 --       'Di.Monad.runDiT' di $ do
---           'Di.Df1.Monad.notice' "Welcome to my program!"
---           -- /You can use 'Di.Df1.Monad.push' to separate different/
---           -- /logging scopes of your program:/
+--           -- Our first log message!
+--           'Di.Df1.Monad.notice'' "Welcome to my program!"
+--           -- You can use `push` to separate different
+--           -- logging scopes of your program:
 --           'Di.Df1.Monad.push' "initialization" $ do
---               -- /something something do initialization/
---               'Di.Df1.Monad.notice' "Starting web server"
+--               'Di.Df1.Monad.notice'' "Starting web server"
+--               'Di.Df1.Monad.alert'' "Disk is almost full"
+--           -- Yet another scope.
 --           'Di.Df1.Monad.push' "server" $ do
---               -- /And you can use 'Di.Df1.Monad.attr' to add metadata to/
---               -- /messages logged within a particular scope./
---               'Di.Df1.Monad.attr' "port" "80" $ do
---                    'Di.Df1.Monad.info' "Listening for new clients"
---                    clientAddress <- /somehow get a client connection/
+--               -- You can use 'Di.Df1.Monad.attr' to add metadata to
+--               -- messages logged within a particular scope.
+--               'Di.Df1.Monad.attr' "port" (80 :: Int) $ do
+--                    'Di.Df1.Monad.info'' "Listening for new clients"
+--                    clientAddress <- do
+--                       -- This is just an example. Whatever.
+--                       pure ("10.0.0.8" :: String)
 --                    'Di.Df1.Monad.push' "handler" $ do
 --                       'Di.Df1.Monad.attr' "client-address" clientAddress $ do
---                          'Di.Df1.Monad.info' "Connection established"
---                          -- /If you throw an exception with 'Di.Monad.throw',/
---                          -- /it will be logged automatically./
---                          'Di.throw' ('userError' "Oops!")
+--                          'Di.Df1.Monad.info'' "Connection established"
+--                          -- If you throw an exception with throw,
+--                          -- it will be logged automatically together
+--                          -- with its current scope. Isn't that nice?
+--                          'Di.Df1.Monad.throw' (userError "Oops!")
 -- @
 --
--- That program will render something like this to 'System.IO.stderr' (in colors!):
+-- That program will render something like this to 'System.IO.stderr':
+--
+-- ![df1 example](https://raw.githubusercontent.com/k0001/di/master/df1/df1.png)
+--
+--
+-- You get the nice colors only if the output is going to a TTY.
+-- Otherwise, you get the same, but without any colors.
 --
 -- @
--- 2018-05-06T19:48:06.194579393Z NOTICE Welcome to my program!
--- 2018-05-06T19:48:06.195041422Z \/initialization NOTICE Starting web server
--- 2018-05-06T19:48:06.195052862Z \/server port=80 INFO Listening for new clients
--- 2018-05-06T19:48:06.195059084Z \/server port=80 \/handler client%2daddress=192%2e168%2e0%2e25%3a32528 INFO Connection established
--- 2018-05-06T19:48:06.195059102Z \/server port=80 \/handler client%2daddress=192%2e168%2e0%2e25%3a32528 exception=user%20error%20(Oops!) WARNING Exception thrown
+-- 2019-11-15T18:05:54.949470902Z NOTICE Welcome to my program!
+-- 2019-11-15T18:05:54.949623731Z \/initialization NOTICE Starting web server
+-- 2019-11-15T18:05:54.949630205Z \/initialization ALERT Disk is almost full
+-- 2019-11-15T18:05:54.949640299Z \/server port=80 INFO Listening for new clients
+-- 2019-11-15T18:05:54.949652133Z \/server port=80 \/handler client-address=10.0.0.8 INFO Connection established
+-- 2019-11-15T18:05:54.949664482Z \/server port=80 \/handler client-address=10.0.0.8 WARNING user error (Oops!)
 -- @
 --
 -- Notice that by default, /all/ exceptions thrown using 'Di.Monad.throw'
--- are logged /at their throw site/ with 'Df1.Warning' level.
+-- are logged /at their throw site/ with 'Df1.Warning' level. You can change
+-- that if you care using 'Di.Monad.onException'.
 --
--- (Unrelated: Notice how /df1/ escapes pretty much all punctuation characters.
--- This is temporal until the /df1/ format is formalized and a more limited set
--- of punctuation characters is reserved.)
+-- Unrelated: /df1/ escapes conflicting punctuation characters as necessary.
 new
   :: (MonadIO m, Ex.MonadMask m)
   => (Di.Core.Di Df1.Level Df1.Path Df1.Message -> m a)

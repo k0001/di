@@ -1,8 +1,10 @@
-# Version HEAD
+# Version 1.2.1
 
 * Improve logging of exceptions.
 
 * Documentation improvements.
+
+* Re-export `debug'`, `info'`, etc. from `Di.Df1.Monad`.
 
 
 # Version 1.2
