@@ -136,7 +136,7 @@ import qualified Di.Monad
 -- main = do
 --    -- First you obtain a 'Di.Core.Di'.
 --    -- You do this once per application, in `main`.
---    new $ \\di -> do
+--    'new' $ \\di -> do
 --       -- You can start logging right away by acting
 --       -- on the on the 'Di.Core.Di' object, but here
 --       -- we encourage using 'Di.Monad.runDiT' and perforfing
@@ -194,7 +194,7 @@ new
   => (Di.Core.Di Df1.Level Df1.Path Df1.Message -> m a)
   -- ^ /This type is the same as @'Di.Df1.Df1' -> m a@./
   --
-  -- ^ Within this scope, you can use the obtained 'Di.Core.Di' safely, even
+  -- Within this scope, you can use the obtained 'Di.Core.Di' safely, even
   -- concurrently. As soon as @m a@ finishes, 'new' will block until
   -- all logs have finished processing, before returning.
   --
