@@ -39,17 +39,17 @@ renderColor :: Log -> BB.Builder
 renderColor = \log_ ->
  let t = renderIso8601 (log_time log_) <> space
      pDef = \fg -> renderPathColor fg fgBlue fgCyan (log_path log_)
-     pRed = renderPathColor fgBlack fgWhite fgWhite (log_path log_)
+     pRed = renderPathColor fgBlack fgWhite fgCyan (log_path log_)
      m = space <> renderMessage (log_message log_) <> reset
  in case log_level log_ of
      Debug -> reset <> t <> pDef fgDefault <> fgDefault <> debug <> m
      Info -> reset <> t <> pDef fgDefault <> fgDefault <> info <> m
      Notice ->
-       bgDefault <> fgGreen <> t <> pDef fgDefault <> fgGreen <> notice <> m
+       reset <> t <> pDef fgDefault <> fgGreen <> notice <> fgDefault <> m
      Warning ->
-       bgDefault <> fgYellow <> t <> pDef fgDefault <> fgYellow <> warning <> m
+       reset <> t <> pDef fgDefault <> fgYellow <> warning <> fgDefault <> m
      Error ->
-       bgDefault <> fgRed <> t <> pDef fgDefault <> fgRed <> error <> m
+       bgWhite <> fgBlack <> t <> pDef fgBlack <> fgRed <> error <> fgBlack <> m
      Critical ->
        bgRed <> fgBlack <> t <> pRed <> fgWhite <> critical <> fgBlack <> m
      Alert ->
@@ -248,10 +248,10 @@ fgDefault :: BB.Builder
 fgDefault = BB.string7 "\x1b[39m"
 {-# INLINE fgDefault #-}
 
--- | Reset background
-bgDefault :: BB.Builder
-bgDefault = BB.string7 "\x1b[49m"
-{-# INLINE bgDefault #-}
+-- -- | Reset background
+-- bgDefault :: BB.Builder
+-- bgDefault = BB.string7 "\x1b[49m"
+-- {-# INLINE bgDefault #-}
 
 -- | green foreground
 fgGreen :: BB.Builder
@@ -292,6 +292,11 @@ fgWhite = BB.string7 "\x1b[37m"
 bgRed :: BB.Builder
 bgRed = BB.string7 "\x1b[41m"
 {-# INLINE bgRed #-}
+
+-- | Red background
+bgWhite :: BB.Builder
+bgWhite = BB.string7 "\x1b[47m"
+{-# INLINE bgWhite #-}
 
 -- | Render @'%'@ followed by the given 'Word8' rendered as two hexadecimal
 -- nibbles.
