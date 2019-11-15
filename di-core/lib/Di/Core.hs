@@ -84,7 +84,7 @@ data Di level path msg = Di
     -- ^ Send a 'Log' for processing.
   , di_flush :: STM ()
     -- ^ Block until all logs finish being processed.
-  , di_logex :: Ex.SomeException -> Maybe (STM ())
+  , di_logex :: Seq path -> Ex.SomeException -> Maybe (STM ())
     -- ^ If an exception deserves logging, then returns an 'STM' action
     -- that will perform the logging.
   }
@@ -144,7 +144,7 @@ new commit act = do
     tmvWOut :: STM.TMVar Ex.SomeException
        <- liftIO STM.newEmptyTMVarIO
     let di = Di { di_filter = \_ _ _ -> True
-                , di_logex = \_ -> Just (pure ())
+                , di_logex = \_ _ -> Just (pure ())
                 , di_send = \x -> STM.tryReadTMVar tmvWOut >>= \case
                      Nothing -> STM.writeTQueue tqLogs x
                      Just ex -> STM.throwSTM ex
@@ -389,7 +389,7 @@ throw'
   -> m a
 throw' nat di = \e -> do
   -- If logging throws an exception, then it will be propagated instead of `e`.
-  nat (sequence_ (di_logex di (Ex.toException e)))
+  nat (sequence_ (di_logex di mempty (Ex.toException e)))
   -- By throwing from inside 'STM' we avoid potentially entering into an
   -- infinite loop in case the implementation of 'Ex.throwM' would take us back
   -- to 'throw''. Also, notice that we need to call `nat` again here, otherwise
@@ -446,10 +446,10 @@ onException
   -> Di level path msg
   -> Di level path msg  -- ^
 onException f = \di0 -> di0
-  { di_logex = \se -> do
-      _ <- di_logex di0 se
-      (l, ps, m) <- f se
-      let di1 = foldl' (flip push) di0 ps
+  { di_logex = \ps0 se -> do
+      _ <- di_logex di0 ps0 se
+      (l, ps1, m) <- f se
+      let di1 = foldl' (flip push) di0 (ps1 <> ps0)
       Just (log' id di1 l m)
   }
 
@@ -497,7 +497,8 @@ filter f = \di ->
 push :: path -> Di level path msg -> Di level path msg
 push p = \di -> di
   { di_send = \x -> di_send di (x { log_path = p Seq.<| log_path x })
-  , di_filter = \l ps m -> di_filter di l (p Seq.<| ps) m }
+  , di_filter = \l ps m -> di_filter di l (p Seq.<| ps) m
+  , di_logex = \ps se -> di_logex di (p Seq.<| ps) se }
 {-# INLINABLE push #-}
 
 -- | A 'Di' is contravariant in its @level@ argument.
@@ -562,6 +563,7 @@ contrapath :: (path -> path') -> Di level path' msg -> Di level path msg
 contrapath f = \di -> di
   { di_send = \x -> di_send di (x { log_path = fmap f (log_path x) })
   , di_filter = \l ps m -> di_filter di l (fmap f ps) m
+  , di_logex = \ps se -> di_logex di (fmap f ps) se
   }
 {-# INLINABLE contrapath #-}
 

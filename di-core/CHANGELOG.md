@@ -4,6 +4,8 @@
 
 * Added `LoggingWorkerNotRunning`.
 
+* Fixed path rendering when logging exceptions.
+
 
 # Version 1.0.3
 
