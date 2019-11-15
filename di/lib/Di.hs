@@ -68,23 +68,11 @@ module Di
    -- * Monadic API
  , Di.Df1.Monad.MonadDf1
 
-   -- ** Hierarchy
+   -- * Hierarchy
  , Di.Df1.Monad.push
- , Df1.Path
- , Df1.Segment
- , Df1.ToSegment(segment)
-
-   -- ** Metadata
+   -- * Metadata
  , Di.Df1.Monad.attr
- , Df1.Key
- , Df1.ToKey(key)
- , Df1.Value
- , Df1.ToValue(value)
-
-   -- ** Messages
- , Df1.Level
- , Df1.Message
- , Df1.ToMessage(message)
+   -- * Logging
  , Di.Df1.Monad.debug
  , Di.Df1.Monad.info
  , Di.Df1.Monad.notice
@@ -93,14 +81,25 @@ module Di
  , Di.Df1.Monad.alert
  , Di.Df1.Monad.critical
  , Di.Df1.Monad.emergency
-
-   -- ** Exceptions
+   -- * Exceptions
  , Di.Monad.throw
 
-   -- * Basic DiT support
+   -- * Support for @DiT@
  , Di.Df1.Monad.Df1T
  , Di.Monad.runDiT
  , Di.Monad.hoistDiT
+
+   -- * Types from @Df1@
+ , Df1.Level
+ , Df1.Path
+ , Df1.Segment
+ , Df1.ToSegment(segment)
+ , Df1.Key
+ , Df1.ToKey(key)
+ , Df1.Value
+ , Df1.ToValue(value)
+ , Df1.Message
+ , Df1.ToMessage(message)
  ) where
 
 import Control.Monad.Catch as Ex

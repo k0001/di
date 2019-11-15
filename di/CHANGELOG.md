@@ -1,3 +1,8 @@
+# Version HEAD
+
+* Documentation improvements.
+
+
 # Version 1.2
 
 * The `MonadThrow` instance for `DiT` doesn't log exceptions automatically any
