@@ -30,7 +30,7 @@ module Di.Df1
  , alert
  , critical
  , emergency
-   -- ** Logging from @STM@
+   -- ** Type-inference helpers
  , debug'
  , info'
  , notice'
@@ -39,6 +39,15 @@ module Di.Df1
  , alert'
  , critical'
  , emergency'
+   -- ** Logging from @STM@
+ , debugSTM
+ , infoSTM
+ , noticeSTM
+ , warningSTM
+ , errorSTM
+ , alertSTM
+ , criticalSTM
+ , emergencySTM
 
    -- * Support for @Di.Handle@
  , df1
@@ -81,7 +90,7 @@ import qualified Df1
 -- This type-synonym is not used within the @di-df1@ library itself because
 -- all functions exposed in the library have more general types. However,
 -- users are encouraged to use 'Df1' if they find it useful to reduce
--- boilerplate and improve type inferrence.
+-- boilerplate and improve type inference.
 type Df1 = Di.Di Df1.Level Df1.Path Df1.Message
 
 --------------------------------------------------------------------------------
@@ -113,7 +122,7 @@ emergency
   => Di.Di Df1.Level path Df1.Message
   -> msg
   -> m ()
-emergency di = Di.log di Df1.Emergency . Df1.message
+emergency di = emergency' di . Df1.message
 {-# INLINE emergency #-}
 
 -- | Log a condition that should be corrected immediately, such as a corrupted
@@ -123,7 +132,7 @@ alert
   => Di.Di Df1.Level path Df1.Message
   -> msg
   -> m ()
-alert di = Di.log di Df1.Alert . Df1.message
+alert di = alert' di . Df1.message
 {-# INLINE alert #-}
 
 -- | Log a critical condition that could result in system failure, such as a
@@ -133,7 +142,7 @@ critical
   => Di.Di Df1.Level path Df1.Message
   -> msg
   -> m ()
-critical di = Di.log di Df1.Critical . Df1.message
+critical di = critical' di . Df1.message
 {-# INLINE critical #-}
 
 -- | Log an error condition, such as an unhandled exception.
@@ -142,7 +151,7 @@ error
   => Di.Di Df1.Level path Df1.Message
   -> msg
   -> m ()
-error di = Di.log di Df1.Error . Df1.message
+error di = error' di . Df1.message
 {-# INLINE error #-}
 
 -- | Log a warning condition, such as an exception being gracefully handled or
@@ -152,7 +161,7 @@ warning
   => Di.Di Df1.Level path Df1.Message
   -> msg
   -> m ()
-warning di = Di.log di Df1.Warning . Df1.message
+warning di = warning' di . Df1.message
 {-# INLINE warning #-}
 
 -- | Log a condition that is not an error, but should possibly be handled
@@ -162,7 +171,7 @@ notice
   => Di.Di Df1.Level path Df1.Message
   -> msg
   -> m ()
-notice di = Di.log di Df1.Notice . Df1.message
+notice di = notice' di . Df1.message
 {-# INLINE notice #-}
 
 -- | Log an informational message.
@@ -171,7 +180,7 @@ info
   => Di.Di Df1.Level path Df1.Message
   -> msg
   -> m ()
-info di = Di.log di Df1.Info . Df1.message
+info di = info' di . Df1.message
 {-# INLINE info #-}
 
 -- | Log a message intended to be useful only when deliberately debugging a
@@ -181,96 +190,190 @@ debug
   => Di.Di Df1.Level path Df1.Message
   -> msg
   -> m ()
-debug di = Di.log di Df1.Debug . Df1.message
+debug di = debug' di . Df1.message
 {-# INLINE debug #-}
+
+--------------------------------------------------------------------------------
+-- MonadIO variants with better type inference
+
+-- | Like 'emergency', but takes a 'Df1.Message' rather than any 'Df1.ToMessage'.
+--
+-- This helps with type inference in case you are trying to
+-- log a literal string and have the @OverloadedStrings@ GHC extension enabled.
+emergency'
+  :: MonadIO m
+  => Di.Di Df1.Level path Df1.Message
+  -> Df1.Message
+  -> m ()
+emergency' di = Di.log di Df1.Emergency
+{-# INLINE emergency' #-}
+
+-- | Like 'critical', but takes a 'Df1.Message' rather than any 'Df1.ToMessage'.
+--
+-- This helps with type inference in case you are trying to
+-- log a literal string and have the @OverloadedStrings@ GHC extension enabled.
+critical'
+  :: MonadIO m
+  => Di.Di Df1.Level path Df1.Message
+  -> Df1.Message
+  -> m ()
+critical' di = Di.log di Df1.Critical
+{-# INLINE critical' #-}
+
+-- | Like 'alert', but takes a 'Df1.Message' rather than any 'Df1.ToMessage'.
+--
+-- This helps with type inference in case you are trying to
+-- log a literal string and have the @OverloadedStrings@ GHC extension enabled.
+alert'
+  :: MonadIO m
+  => Di.Di Df1.Level path Df1.Message
+  -> Df1.Message
+  -> m ()
+alert' di = Di.log di Df1.Alert
+{-# INLINE alert' #-}
+
+-- | Like 'error', but takes a 'Df1.Message' rather than any 'Df1.ToMessage'.
+--
+-- This helps with type inference in case you are trying to
+-- log a literal string and have the @OverloadedStrings@ GHC extension enabled.
+error'
+  :: MonadIO m
+  => Di.Di Df1.Level path Df1.Message
+  -> Df1.Message
+  -> m ()
+error' di = Di.log di Df1.Error
+{-# INLINE error' #-}
+
+-- | Like 'warning', but takes a 'Df1.Message' rather than any 'Df1.ToMessage'.
+--
+-- This helps with type inference in case you are trying to
+-- log a literal string and have the @OverloadedStrings@ GHC extension enabled.
+warning'
+  :: MonadIO m
+  => Di.Di Df1.Level path Df1.Message
+  -> Df1.Message
+  -> m ()
+warning' di = Di.log di Df1.Warning
+{-# INLINE warning' #-}
+
+-- | Like 'notice', but takes a 'Df1.Message' rather than any 'Df1.ToMessage'.
+--
+-- This helps with type inference in case you are trying to
+-- log a literal string and have the @OverloadedStrings@ GHC extension enabled.
+notice'
+  :: MonadIO m
+  => Di.Di Df1.Level path Df1.Message
+  -> Df1.Message
+  -> m ()
+notice' di = Di.log di Df1.Notice
+{-# INLINE notice' #-}
+
+-- | Like 'info', but takes a 'Df1.Message' rather than any 'Df1.ToMessage'.
+--
+-- This helps with type inference in case you are trying to
+-- log a literal string and have the @OverloadedStrings@ GHC extension enabled.
+info'
+  :: MonadIO m
+  => Di.Di Df1.Level path Df1.Message
+  -> Df1.Message
+  -> m ()
+info' di = Di.log di Df1.Info
+{-# INLINE info' #-}
+
+-- | Like 'debug', but takes a 'Df1.Message' rather than any 'Df1.ToMessage'.
+--
+-- This helps with type inference in case you are trying to
+-- log a literal string and have the @OverloadedStrings@ GHC extension enabled.
+debug'
+  :: MonadIO m
+  => Di.Di Df1.Level path Df1.Message
+  -> Df1.Message
+  -> m ()
+debug' di = Di.log di Df1.Debug
+{-# INLINE debug' #-}
 
 --------------------------------------------------------------------------------
 -- STM variants
 
--- | Log a message stating that the system is unusable.
-emergency'
+-- | Like 'emergency', but can be used from any 'Monad' supporting 'STM'.
+emergencySTM
   :: (Monad m, Df1.ToMessage msg)
   => (forall x. STM x -> m x)
   -> Di.Di Df1.Level path Df1.Message
   -> msg
   -> m ()
-emergency' natSTM di = Di.log' natSTM di Df1.Emergency . Df1.message
-{-# INLINE emergency' #-}
+emergencySTM natSTM di = Di.log' natSTM di Df1.Emergency . Df1.message
+{-# INLINE emergencySTM #-}
 
--- | Log a condition that should be corrected immediately, such as a corrupted
--- database.
-alert'
+-- | Like 'critical', but can be used from any 'Monad' supporting 'STM'.
+criticalSTM
   :: (Monad m, Df1.ToMessage msg)
   => (forall x. STM x -> m x)
   -> Di.Di Df1.Level path Df1.Message
   -> msg
   -> m ()
-alert' natSTM di = Di.log' natSTM di Df1.Alert . Df1.message
-{-# INLINE alert' #-}
+criticalSTM natSTM di = Di.log' natSTM di Df1.Critical . Df1.message
+{-# INLINE criticalSTM #-}
 
--- | Log a critical condition that could result in system failure, such as a
--- disk running out of space.
-critical'
+-- | Like 'alert', but can be used from any 'Monad' supporting 'STM'.
+alertSTM
   :: (Monad m, Df1.ToMessage msg)
   => (forall x. STM x -> m x)
   -> Di.Di Df1.Level path Df1.Message
   -> msg
   -> m ()
-critical' natSTM di = Di.log' natSTM di Df1.Critical . Df1.message
-{-# INLINE critical' #-}
+alertSTM natSTM di = Di.log' natSTM di Df1.Alert . Df1.message
+{-# INLINE alertSTM #-}
 
--- | Log an error condition, such as an unhandled exception.
-error'
+-- | Like 'error', but can be used from any 'Monad' supporting 'STM'.
+errorSTM
   :: (Monad m, Df1.ToMessage msg)
   => (forall x. STM x -> m x)
   -> Di.Di Df1.Level path Df1.Message
   -> msg
   -> m ()
-error' natSTM di = Di.log' natSTM di Df1.Error . Df1.message
-{-# INLINE error' #-}
+errorSTM natSTM di = Di.log' natSTM di Df1.Error . Df1.message
+{-# INLINE errorSTM #-}
 
--- | Log a warning condition, such as an exception being gracefully handled or
--- some missing configuration setting being assigned a default value.
-warning'
+-- | Like 'warning', but can be used from any 'Monad' supporting 'STM'.
+warningSTM
   :: (Monad m, Df1.ToMessage msg)
   => (forall x. STM x -> m x)
   -> Di.Di Df1.Level path Df1.Message
   -> msg
   -> m ()
-warning' natSTM di = Di.log' natSTM di Df1.Warning . Df1.message
-{-# INLINE warning' #-}
+warningSTM natSTM di = Di.log' natSTM di Df1.Warning . Df1.message
+{-# INLINE warningSTM #-}
 
--- | Log a condition that is not an error, but should possibly be handled
--- specially.
-notice'
+-- | Like 'notice', but can be used from any 'Monad' supporting 'STM'.
+noticeSTM
   :: (Monad m, Df1.ToMessage msg)
   => (forall x. STM x -> m x)
   -> Di.Di Df1.Level path Df1.Message
   -> msg
   -> m ()
-notice' natSTM di = Di.log' natSTM di Df1.Notice . Df1.message
-{-# INLINE notice' #-}
+noticeSTM natSTM di = Di.log' natSTM di Df1.Notice . Df1.message
+{-# INLINE noticeSTM #-}
 
--- | Log an informational message.
-info'
+-- | Like 'info', but can be used from any 'Monad' supporting 'STM'.
+infoSTM
   :: (Monad m, Df1.ToMessage msg)
   => (forall x. STM x -> m x)
   -> Di.Di Df1.Level path Df1.Message
   -> msg
   -> m ()
-info' natSTM di = Di.log' natSTM di Df1.Info . Df1.message
-{-# INLINE info' #-}
+infoSTM natSTM di = Di.log' natSTM di Df1.Info . Df1.message
+{-# INLINE infoSTM #-}
 
--- | Log a message intended to be useful only when deliberately debugging a
--- program.
-debug'
+-- | Like 'debug', but can be used from any 'Monad' supporting 'STM'.
+debugSTM
   :: (Monad m, Df1.ToMessage msg)
   => (forall x. STM x -> m x)
   -> Di.Di Df1.Level path Df1.Message
   -> msg
   -> m ()
-debug' natSTM di = Di.log' natSTM di Df1.Debug . Df1.message
-{-# INLINE debug' #-}
+debugSTM natSTM di = Di.log' natSTM di Df1.Debug . Df1.message
+{-# INLINE debugSTM #-}
 
 --------------------------------------------------------------------------------
 

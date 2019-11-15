@@ -1,4 +1,9 @@
-# Version HEAD
+# Version 1.1
+
+* COMPILER ASSISTED BREAKING CHANGE: The `STM` compatible logging functions
+  previously called `debug'`, `info'`, etc. are now called `debugSTM`,
+  `infoSTM`, etc. The names such as `debug'`, `info'`, etc. are now what `debug`,
+  `info`, etc. were in the previous version.
 
 * Take `ToValue` and `ToMessage` instances where possible, rather than values of
   type `Value` and `Message`.
