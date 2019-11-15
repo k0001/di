@@ -1,6 +1,8 @@
-# Version HEAD
+# Version 0.3.2
 
 * Added `ToValue` instances for common types like `Int`, `Bool`, etc.
+
+* Changed colours in `Log` rendering.
 
 
 # Version 0.3.1
