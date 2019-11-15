@@ -21,7 +21,7 @@ module Di.Df1
  , push
    -- * Metadata
  , attr
-   -- * Messages
+   -- * Logging from @IO@
  , debug
  , info
  , notice
@@ -30,7 +30,7 @@ module Di.Df1
  , alert
  , critical
  , emergency
-   -- ** Non 'MonadIO' variants
+   -- ** Logging from @STM@
  , debug'
  , info'
  , notice'
@@ -40,11 +40,23 @@ module Di.Df1
  , critical'
  , emergency'
 
-   -- * "Di.Handle" support
+   -- * Support for @Di.Handle@
  , df1
    -- * Conversion
  , fromDiLog
  , fromDf1Log
+
+   -- * Types from @Df1@
+ , Df1.Level
+ , Df1.Path
+ , Df1.Segment
+ , Df1.ToSegment(segment)
+ , Df1.Key
+ , Df1.ToKey(key)
+ , Df1.Value
+ , Df1.ToValue(value)
+ , Df1.Message
+ , Df1.ToMessage(message)
  ) where
 
 import Control.Concurrent.STM (STM)
@@ -84,11 +96,12 @@ push s = Di.push (Df1.Push s)
 
 -- | Push a new attribute 'Df1.Key' and 'Df1.Value' to the 'Di.Di'.
 attr
-  :: Df1.Key
-  -> Df1.Value
+  :: Df1.ToValue value
+  => Df1.Key
+  -> value
   -> Di.Di level Df1.Path msg
   -> Di.Di level Df1.Path msg   -- ^
-attr k v = Di.push (Df1.Attr k v)
+attr k v = Di.push (Df1.Attr k (Df1.value v))
 {-# INLINE attr #-}
 
 --------------------------------------------------------------------------------
@@ -96,79 +109,79 @@ attr k v = Di.push (Df1.Attr k v)
 
 -- | Log a message stating that the system is unusable.
 emergency
-  :: MonadIO m
+  :: (MonadIO m, Df1.ToMessage msg)
   => Di.Di Df1.Level path Df1.Message
-  -> Df1.Message
+  -> msg
   -> m ()
-emergency di = Di.log di Df1.Emergency
+emergency di = Di.log di Df1.Emergency . Df1.message
 {-# INLINE emergency #-}
 
 -- | Log a condition that should be corrected immediately, such as a corrupted
 -- database.
 alert
-  :: MonadIO m
+  :: (MonadIO m, Df1.ToMessage msg)
   => Di.Di Df1.Level path Df1.Message
-  -> Df1.Message
+  -> msg
   -> m ()
-alert di = Di.log di Df1.Alert
+alert di = Di.log di Df1.Alert . Df1.message
 {-# INLINE alert #-}
 
 -- | Log a critical condition that could result in system failure, such as a
 -- disk running out of space.
 critical
-  :: MonadIO m
+  :: (MonadIO m, Df1.ToMessage msg)
   => Di.Di Df1.Level path Df1.Message
-  -> Df1.Message
+  -> msg
   -> m ()
-critical di = Di.log di Df1.Critical
+critical di = Di.log di Df1.Critical . Df1.message
 {-# INLINE critical #-}
 
 -- | Log an error condition, such as an unhandled exception.
 error
-  :: MonadIO m
+  :: (MonadIO m, Df1.ToMessage msg)
   => Di.Di Df1.Level path Df1.Message
-  -> Df1.Message
+  -> msg
   -> m ()
-error di = Di.log di Df1.Error
+error di = Di.log di Df1.Error . Df1.message
 {-# INLINE error #-}
 
 -- | Log a warning condition, such as an exception being gracefully handled or
 -- some missing configuration setting being assigned a default value.
 warning
-  :: MonadIO m
+  :: (MonadIO m, Df1.ToMessage msg)
   => Di.Di Df1.Level path Df1.Message
-  -> Df1.Message
+  -> msg
   -> m ()
-warning di = Di.log di Df1.Warning
+warning di = Di.log di Df1.Warning . Df1.message
 {-# INLINE warning #-}
 
 -- | Log a condition that is not an error, but should possibly be handled
 -- specially.
 notice
-  :: MonadIO m
+  :: (MonadIO m, Df1.ToMessage msg)
   => Di.Di Df1.Level path Df1.Message
-  -> Df1.Message
+  -> msg
   -> m ()
-notice di = Di.log di Df1.Notice
+notice di = Di.log di Df1.Notice . Df1.message
 {-# INLINE notice #-}
 
 -- | Log an informational message.
 info
-  :: MonadIO m
+  :: (MonadIO m, Df1.ToMessage msg)
   => Di.Di Df1.Level path Df1.Message
-  -> Df1.Message
+  -> msg
   -> m ()
-info di = Di.log di Df1.Info
+info di = Di.log di Df1.Info . Df1.message
 {-# INLINE info #-}
 
 -- | Log a message intended to be useful only when deliberately debugging a
 -- program.
 debug
-  :: MonadIO m
+  :: (MonadIO m, Df1.ToMessage msg)
   => Di.Di Df1.Level path Df1.Message
-  -> Df1.Message
+  -> msg
   -> m ()
-debug di = Di.log di Df1.Debug
+debug di = Di.log di Df1.Debug . Df1.message
 {-# INLINE debug #-}
 
 --------------------------------------------------------------------------------
@@ -176,87 +189,87 @@ debug di = Di.log di Df1.Debug
 
 -- | Log a message stating that the system is unusable.
 emergency'
-  :: Monad m
+  :: (Monad m, Df1.ToMessage msg)
   => (forall x. STM x -> m x)
   -> Di.Di Df1.Level path Df1.Message
-  -> Df1.Message
+  -> msg
   -> m ()
-emergency' natSTM di = Di.log' natSTM di Df1.Emergency
+emergency' natSTM di = Di.log' natSTM di Df1.Emergency . Df1.message
 {-# INLINE emergency' #-}
 
 -- | Log a condition that should be corrected immediately, such as a corrupted
 -- database.
 alert'
-  :: Monad m
+  :: (Monad m, Df1.ToMessage msg)
   => (forall x. STM x -> m x)
   -> Di.Di Df1.Level path Df1.Message
-  -> Df1.Message
+  -> msg
   -> m ()
-alert' natSTM di = Di.log' natSTM di Df1.Alert
+alert' natSTM di = Di.log' natSTM di Df1.Alert . Df1.message
 {-# INLINE alert' #-}
 
 -- | Log a critical condition that could result in system failure, such as a
 -- disk running out of space.
 critical'
-  :: Monad m
+  :: (Monad m, Df1.ToMessage msg)
   => (forall x. STM x -> m x)
   -> Di.Di Df1.Level path Df1.Message
-  -> Df1.Message
+  -> msg
   -> m ()
-critical' natSTM di = Di.log' natSTM di Df1.Critical
+critical' natSTM di = Di.log' natSTM di Df1.Critical . Df1.message
 {-# INLINE critical' #-}
 
 -- | Log an error condition, such as an unhandled exception.
 error'
-  :: Monad m
+  :: (Monad m, Df1.ToMessage msg)
   => (forall x. STM x -> m x)
   -> Di.Di Df1.Level path Df1.Message
-  -> Df1.Message
+  -> msg
   -> m ()
-error' natSTM di = Di.log' natSTM di Df1.Error
+error' natSTM di = Di.log' natSTM di Df1.Error . Df1.message
 {-# INLINE error' #-}
 
 -- | Log a warning condition, such as an exception being gracefully handled or
 -- some missing configuration setting being assigned a default value.
 warning'
-  :: Monad m
+  :: (Monad m, Df1.ToMessage msg)
   => (forall x. STM x -> m x)
   -> Di.Di Df1.Level path Df1.Message
-  -> Df1.Message
+  -> msg
   -> m ()
-warning' natSTM di = Di.log' natSTM di Df1.Warning
+warning' natSTM di = Di.log' natSTM di Df1.Warning . Df1.message
 {-# INLINE warning' #-}
 
 -- | Log a condition that is not an error, but should possibly be handled
 -- specially.
 notice'
-  :: Monad m
+  :: (Monad m, Df1.ToMessage msg)
   => (forall x. STM x -> m x)
   -> Di.Di Df1.Level path Df1.Message
-  -> Df1.Message
+  -> msg
   -> m ()
-notice' natSTM di = Di.log' natSTM di Df1.Notice
+notice' natSTM di = Di.log' natSTM di Df1.Notice . Df1.message
 {-# INLINE notice' #-}
 
 -- | Log an informational message.
 info'
-  :: Monad m
+  :: (Monad m, Df1.ToMessage msg)
   => (forall x. STM x -> m x)
   -> Di.Di Df1.Level path Df1.Message
-  -> Df1.Message
+  -> msg
   -> m ()
-info' natSTM di = Di.log' natSTM di Df1.Info
+info' natSTM di = Di.log' natSTM di Df1.Info . Df1.message
 {-# INLINE info' #-}
 
 -- | Log a message intended to be useful only when deliberately debugging a
 -- program.
 debug'
-  :: Monad m
+  :: (Monad m, Df1.ToMessage msg)
   => (forall x. STM x -> m x)
   -> Di.Di Df1.Level path Df1.Message
-  -> Df1.Message
+  -> msg
   -> m ()
-debug' natSTM di = Di.log' natSTM di Df1.Debug
+debug' natSTM di = Di.log' natSTM di Df1.Debug . Df1.message
 {-# INLINE debug' #-}
 
 --------------------------------------------------------------------------------

@@ -5,12 +5,11 @@
 module Di.Df1.Monad
  ( Df1T
  , MonadDf1
-
    -- * Hierarchy
  , push
    -- * Metadata
  , attr
-   -- * Messages
+   -- * Logging
  , debug
  , info
  , notice
@@ -70,60 +69,89 @@ type MonadDf1 = Di.MonadDi Df1.Level Df1.Path Df1.Message
 -- | Push a new 'Df1.Segment' to the 'Di.MonadDi'.
 push
   :: Di.MonadDi level Df1.Path msg m
-  => Df1.Segment -> m a -> m a  -- ^
+  => Df1.Segment
+  -> m a
+  -> m a  -- ^
 push s = Di.push (Df1.Push s)
 {-# INLINE push #-}
 
 -- | Push a new attribute 'Df1.Key' and 'Df1.Value' to the 'Di.MonadDi'.
 attr
-  :: Di.MonadDi level Df1.Path msg m
-  => Df1.Key -> Df1.Value -> m a -> m a -- ^
-attr k v = Di.push (Df1.Attr k v)
+  :: (Di.MonadDi level Df1.Path msg m, Df1.ToValue value)
+  => Df1.Key
+  -> value
+  -> m a
+  -> m a -- ^
+attr k v = Di.push (Df1.Attr k (Df1.value v))
 {-# INLINE attr #-}
 
 --------------------------------------------------------------------------------
 
 -- | Log a message stating that the system is unusable.
-emergency :: Di.MonadDi Df1.Level path Df1.Message m => Df1.Message -> m ()
-emergency = Di.log Df1.Emergency
+emergency
+  :: (Di.MonadDi Df1.Level path Df1.Message m, Df1.ToMessage msg)
+  => msg
+  -> m ()
+emergency = Di.log Df1.Emergency . Df1.message
 {-# INLINE emergency #-}
 
 -- | Log a condition that should be corrected immediately, such as a corrupted
 -- database.
-alert :: Di.MonadDi Df1.Level path Df1.Message m => Df1.Message -> m ()
-alert = Di.log Df1.Alert
+alert
+  :: (Di.MonadDi Df1.Level path Df1.Message m, Df1.ToMessage msg)
+  => msg
+  -> m ()
+alert = Di.log Df1.Alert . Df1.message
 {-# INLINE alert #-}
 
 -- | Log a critical condition that could result in system failure, such as a
 -- disk running out of space.
-critical :: Di.MonadDi Df1.Level path Df1.Message m => Df1.Message -> m ()
-critical = Di.log Df1.Critical
+critical
+  :: (Di.MonadDi Df1.Level path Df1.Message m, Df1.ToMessage msg)
+  => msg
+  -> m ()
+critical = Di.log Df1.Critical . Df1.message
 {-# INLINE critical #-}
 
 -- | Log an error condition, such as an unhandled exception.
-error :: Di.MonadDi Df1.Level path Df1.Message m => Df1.Message -> m ()
-error = Di.log Df1.Error
+error
+  :: (Di.MonadDi Df1.Level path Df1.Message m, Df1.ToMessage msg)
+  => msg
+  -> m ()
+error = Di.log Df1.Error . Df1.message
 {-# INLINE error #-}
 
 -- | Log a warning condition, such as an exception being gracefully handled or
 -- some missing configuration setting being assigned a default value.
-warning :: Di.MonadDi Df1.Level path Df1.Message m => Df1.Message -> m ()
-warning = Di.log Df1.Warning
+warning
+  :: (Di.MonadDi Df1.Level path Df1.Message m, Df1.ToMessage msg)
+  => msg
+  -> m ()
+warning = Di.log Df1.Warning . Df1.message
 {-# INLINE warning #-}
 
 -- | Log a condition that is not an error, but should possibly be handled
 -- specially.
-notice :: Di.MonadDi Df1.Level path Df1.Message m => Df1.Message -> m ()
-notice = Di.log Df1.Notice
+notice
+  :: (Di.MonadDi Df1.Level path Df1.Message m, Df1.ToMessage msg)
+  => msg
+  -> m ()
+notice = Di.log Df1.Notice . Df1.message
 {-# INLINE notice #-}
 
 -- | Log an informational message.
-info :: Di.MonadDi Df1.Level path Df1.Message m => Df1.Message -> m ()
-info = Di.log Df1.Info
+info
+  :: (Di.MonadDi Df1.Level path Df1.Message m, Df1.ToMessage msg)
+  => msg
+  -> m ()
+info = Di.log Df1.Info . Df1.message
 {-# INLINE info #-}
 
 -- | Log a message intended to be useful only when deliberately debugging a
 -- program.
-debug :: Di.MonadDi Df1.Level path Df1.Message m => Df1.Message -> m ()
-debug = Di.log Df1.Debug
+debug
+  :: (Di.MonadDi Df1.Level path Df1.Message m, Df1.ToMessage msg)
+  => msg
+  -> m ()
+debug = Di.log Df1.Debug . Df1.message
 {-# INLINE debug #-}
