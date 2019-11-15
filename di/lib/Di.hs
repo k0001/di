@@ -199,7 +199,7 @@ new
   -- all logs have finished processing, before returning.
   --
   -- /WARNING:/ Even while @'new' commit 'pure' :: m ('Di.Core.Di' 'Df1.Level'
-  -- 'Df1.Path' 'Df1.Message')@ type-checks, attempting to use the obtained 'Di'
+  -- 'Df1.Path' 'Df1.Message')@ type-checks, attempting to use the obtained 'Di.Core.Di'
   -- outside its intended scope will fail.
   -> m a -- ^
 new act = do
