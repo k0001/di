@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 
@@ -16,6 +17,9 @@ import Data.Semigroup (Semigroup((<>)))
 import Data.Sequence as Seq
 import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
+import Data.Int (Int8, Int16, Int32, Int64)
+import Data.Word (Word8, Word16, Word32, Word64)
+import Numeric.Natural (Natural)
 import Data.String (IsString(fromString))
 import qualified Data.Time.Clock.System as Time
 
@@ -381,6 +385,52 @@ instance ToValue T.Text where
 -- @
 instance ToValue String where
   value = Value . TL.pack
+  {-# INLINE value #-}
+
+instance ToValue Bool where
+  value = \b -> if b then Value "true" else Value "false"
+  {-# INLINE value #-}
+instance ToValue Int where
+  value = value . show
+  {-# INLINE value #-}
+instance ToValue Int8 where
+  value = value . show
+  {-# INLINE value #-}
+instance ToValue Int16 where
+  value = value . show
+  {-# INLINE value #-}
+instance ToValue Int32 where
+  value = value . show
+  {-# INLINE value #-}
+instance ToValue Int64 where
+  value = value . show
+  {-# INLINE value #-}
+instance ToValue Word where
+  value = value . show
+  {-# INLINE value #-}
+instance ToValue Word8 where
+  value = value . show
+  {-# INLINE value #-}
+instance ToValue Word16 where
+  value = value . show
+  {-# INLINE value #-}
+instance ToValue Word32 where
+  value = value . show
+  {-# INLINE value #-}
+instance ToValue Word64 where
+  value = value . show
+  {-# INLINE value #-}
+instance ToValue Integer where
+  value = value . show
+  {-# INLINE value #-}
+instance ToValue Natural where
+  value = value . show
+  {-# INLINE value #-}
+instance ToValue Float where
+  value = value . show
+  {-# INLINE value #-}
+instance ToValue Double where
+  value = value . show
   {-# INLINE value #-}
 
 --------------------------------------------------------------------------------

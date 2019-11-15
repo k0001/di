@@ -1,3 +1,8 @@
+# Version HEAD
+
+* Added `ToValue` instances for common types like `Int`, `Bool`, etc.
+
+
 # Version 0.3.1
 
 * Added missing language pragma.
