@@ -164,7 +164,7 @@ import qualified Di.Monad
 --                          -- If you throw an exception with throw,
 --                          -- it will be logged automatically together
 --                          -- with its current scope. Isn't that nice?
---                          'Di.Df1.Monad.throw' (userError "Oops!")
+--                          'Di.Monad.throw' (userError "Oops!")
 -- @
 --
 -- That program will render something like this to 'System.IO.stderr':
