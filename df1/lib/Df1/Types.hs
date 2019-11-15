@@ -13,6 +13,7 @@ module Df1.Types
  , Message, unMessage, ToMessage(message)
  ) where
 
+import Control.Exception (SomeException)
 import Data.Semigroup (Semigroup((<>)))
 import Data.Sequence as Seq
 import qualified Data.Text as T
@@ -120,6 +121,10 @@ instance ToMessage T.Text where
 -- @
 instance ToMessage String where
   message = Message . TL.pack
+  {-# INLINE message #-}
+
+instance ToMessage SomeException where
+  message = message . show
   {-# INLINE message #-}
 
 --------------------------------------------------------------------------------
@@ -387,9 +392,14 @@ instance ToValue String where
   value = Value . TL.pack
   {-# INLINE value #-}
 
+instance ToValue SomeException where
+  value = value . show
+  {-# INLINE value #-}
+
 instance ToValue Bool where
   value = \b -> if b then Value "true" else Value "false"
   {-# INLINE value #-}
+
 instance ToValue Int where
   value = value . show
   {-# INLINE value #-}
