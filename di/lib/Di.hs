@@ -105,7 +105,6 @@ module Di
 import Control.Monad.Catch as Ex
 import Control.Monad.IO.Class (MonadIO)
 import Data.Sequence (Seq)
-import Data.String (fromString)
 
 import qualified Df1
 import qualified Di.Core
@@ -187,9 +186,5 @@ exceptionHandler
   :: Ex.SomeException
   -> Maybe (Df1.Level, Seq Df1.Path, Df1.Message)
 {-# INLINE exceptionHandler #-}
-exceptionHandler = \se -> Just
-  ( Df1.Warning
-  , pure (Df1.Attr "exception" (fromString (show se)))
-  , "Exception thrown"
-  )
+exceptionHandler = \se -> Just (Df1.Warning, mempty, Df1.message se)
 

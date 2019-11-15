@@ -1,5 +1,7 @@
 # Version HEAD
 
+* Improve logging of exceptions.
+
 * Documentation improvements.
 
 
