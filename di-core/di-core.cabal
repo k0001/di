@@ -1,8 +1,8 @@
 name: di-core
-version: 1.0.3
+version: 1.0.4
 author: Renzo Carbonara
 maintainer: renλren.zone
-copyright: Renzo Carbonara 2017-2018
+copyright: Renzo Carbonara 2017
 license: BSD3
 license-file: LICENSE.txt
 extra-source-files: README.md CHANGELOG.md
