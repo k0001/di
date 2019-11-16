@@ -1,3 +1,8 @@
+# Version 1.2.2
+
+* Re-export `ask` from `Di.Df1.Monad`.
+
+
 # Version 1.2.1
 
 * Improve logging of exceptions.

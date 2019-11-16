@@ -63,10 +63,6 @@
 -- @
 module Di
  ( new
- , Di.Df1.Df1
-
-   -- * Monadic API
- , Di.Df1.Monad.MonadDf1
 
    -- * Hierarchy
  , Di.Df1.Monad.push
@@ -94,10 +90,15 @@ module Di
    -- * Exceptions
  , Di.Monad.throw
 
-   -- * Support for @DiT@
- , Di.Df1.Monad.Df1T
+   -- * Support for @MonadDi@ and @DiT@
  , Di.Monad.runDiT
  , Di.Monad.hoistDiT
+ , Di.Monad.ask
+
+   -- * Convenient type-synonyms
+ , Di.Df1.Df1
+ , Di.Df1.Monad.Df1T
+ , Di.Df1.Monad.MonadDf1
 
    -- * Types from @Df1@
  , Df1.Level
