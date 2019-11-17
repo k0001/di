@@ -1,3 +1,12 @@
+# Version 1.3
+
+* COMPILER ASSISTED BREAKING CHANGE: Renaming logging functions again.
+  For example, `info` is the name we give to the `ToMessage`-polymorphic
+  logging functions, `info_` to their `Message`-monomorphic version, and
+  `info'` to the `STM` version. The previous `STM` suffix in `infoSTM`
+  is gone, so as to mimick the naming conventions of `di-core`.
+
+
 # Version 1.2.2
 
 * Re-export `ask` from `Di.Df1.Monad`.

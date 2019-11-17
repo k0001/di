@@ -78,14 +78,14 @@ module Di
  , Di.Df1.Monad.critical
  , Di.Df1.Monad.emergency
    -- ** Better type-inference
- , Di.Df1.Monad.debug'
- , Di.Df1.Monad.info'
- , Di.Df1.Monad.notice'
- , Di.Df1.Monad.warning'
- , Di.Df1.Monad.error'
- , Di.Df1.Monad.alert'
- , Di.Df1.Monad.critical'
- , Di.Df1.Monad.emergency'
+ , Di.Df1.Monad.debug_
+ , Di.Df1.Monad.info_
+ , Di.Df1.Monad.notice_
+ , Di.Df1.Monad.warning_
+ , Di.Df1.Monad.error_
+ , Di.Df1.Monad.alert_
+ , Di.Df1.Monad.critical_
+ , Di.Df1.Monad.emergency_
 
    -- * Exceptions
  , Di.Monad.throw
@@ -144,24 +144,24 @@ import qualified Di.Monad
 --       -- all your logging from within a 'Di.Df1.Monad.MonadDf1'.
 --       'Di.Monad.runDiT' di $ do
 --           -- Our first log message!
---           'Di.Df1.Monad.notice'' "Welcome to my program!"
+--           'Di.Df1.Monad.notice_' "Welcome to my program!"
 --           -- You can use `push` to separate different
 --           -- logging scopes of your program:
 --           'Di.Df1.Monad.push' "initialization" $ do
---               'Di.Df1.Monad.notice'' "Starting web server"
---               'Di.Df1.Monad.alert'' "Disk is almost full"
+--               'Di.Df1.Monad.notice_' "Starting web server"
+--               'Di.Df1.Monad.alert_' "Disk is almost full"
 --           -- Yet another scope.
 --           'Di.Df1.Monad.push' "server" $ do
 --               -- You can use 'Di.Df1.Monad.attr' to add metadata to
 --               -- messages logged within a particular scope.
 --               'Di.Df1.Monad.attr' "port" (80 :: Int) $ do
---                    'Di.Df1.Monad.info'' "Listening for new clients"
+--                    'Di.Df1.Monad.info_' "Listening for new clients"
 --                    clientAddress <- do
 --                       -- This is just an example. Whatever.
 --                       pure ("10.0.0.8" :: String)
 --                    'Di.Df1.Monad.push' "handler" $ do
 --                       'Di.Df1.Monad.attr' "client-address" clientAddress $ do
---                          'Di.Df1.Monad.info'' "Connection established"
+--                          'Di.Df1.Monad.info_' "Connection established"
 --                          -- If you throw an exception with throw,
 --                          -- it will be logged automatically together
 --                          -- with its current scope. Isn't that nice?

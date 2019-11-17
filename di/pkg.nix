@@ -3,7 +3,7 @@
 }:
 mkDerivation {
   pname = "di";
-  version = "1.2.2";
+  version = "1.3";
   src = ./.;
   libraryHaskellDepends = [
     base containers df1 di-core di-df1 di-handle di-monad exceptions
