@@ -150,7 +150,7 @@ import qualified Di.Monad
 --           -- logging scopes of your program:
 --           'Di.Df1.Monad.push' "initialization" $ do
 --               'Di.Df1.Monad.notice_' "Starting web server"
---               'Di.Df1.Monad.alert_' "Disk is almost full"
+--               'Di.Df1.Monad.alert_' "Disk is almost full!!!"
 --           -- Yet another scope.
 --           'Di.Df1.Monad.push' "server" $ do
 --               -- You can use 'Di.Df1.Monad.attr' to add metadata to
@@ -180,7 +180,7 @@ import qualified Di.Monad
 -- @
 -- 2019-11-15T18:05:54.949470902Z NOTICE Welcome to my program!
 -- 2019-11-15T18:05:54.949623731Z \/initialization NOTICE Starting web server
--- 2019-11-15T18:05:54.949630205Z \/initialization ALERT Disk is almost full
+-- 2019-11-15T18:05:54.949630205Z \/initialization ALERT Disk is almost full!!!
 -- 2019-11-15T18:05:54.949640299Z \/server port=80 INFO Listening for new clients
 -- 2019-11-15T18:05:54.949652133Z \/server port=80 \/handler client-address=10.0.0.8 INFO Connection established
 -- 2019-11-15T18:05:54.949664482Z \/server port=80 \/handler client-address=10.0.0.8 WARNING user error (Oops!)
