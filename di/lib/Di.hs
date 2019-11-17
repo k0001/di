@@ -94,7 +94,7 @@ module Di
    -- * Support for @MonadDi@ and @DiT@
  , Di.Monad.runDiT
  , Di.Monad.hoistDiT
- , Di.Monad.ask
+ , Di.Monad.MonadDi(..)
 
    -- * Convenient type-synonyms
  , Di.Df1.Df1

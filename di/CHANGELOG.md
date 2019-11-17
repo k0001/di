@@ -8,6 +8,8 @@
 
 * Re-export `attr_` from `Di.Df1.Monad`.
 
+* Re-export all of `MonadDi(..)` from `Di.Df1.Monad`.
+
 # Version 1.2.2
 
 * Re-export `ask` from `Di.Df1.Monad`.
