@@ -68,6 +68,7 @@ module Di
  , Di.Df1.Monad.push
    -- * Metadata
  , Di.Df1.Monad.attr
+ , Di.Df1.Monad.attr_
    -- * Logging
  , Di.Df1.Monad.debug
  , Di.Df1.Monad.info

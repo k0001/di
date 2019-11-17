@@ -6,6 +6,7 @@
   `info'` to the `STM` version. The previous `STM` suffix in `infoSTM`
   is gone, so as to mimick the naming conventions of `di-core`.
 
+* Export `attr_`.
 
 # Version 1.1
 

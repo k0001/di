@@ -21,6 +21,7 @@ module Di.Df1
  , push
    -- * Metadata
  , attr
+ , attr_
    -- * Logging from @IO@
  , debug
  , info
@@ -110,8 +111,20 @@ attr
   -> value
   -> Di.Di level Df1.Path msg
   -> Di.Di level Df1.Path msg   -- ^
-attr k v = Di.push (Df1.Attr k (Df1.value v))
+attr k v = attr_ k (Df1.value v)
 {-# INLINE attr #-}
+
+-- | Like 'attr', but takes a 'Df1.Value' rather than any 'Df1.ToValue'.
+--
+-- This helps with type inference in case you are trying to
+-- log a literal string and have the @OverloadedStrings@ GHC extension enabled.
+attr_
+  :: Df1.Key
+  -> Df1.Value
+  -> Di.Di level Df1.Path msg
+  -> Di.Di level Df1.Path msg   -- ^
+attr_ k v = Di.push (Df1.Attr k v)
+{-# INLINE attr_ #-}
 
 --------------------------------------------------------------------------------
 -- MonadIO variants.

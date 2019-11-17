@@ -6,6 +6,7 @@
   `info'` to the `STM` version. The previous `STM` suffix in `infoSTM`
   is gone, so as to mimick the naming conventions of `di-core`.
 
+* Re-export `attr_` from `Di.Df1.Monad`.
 
 # Version 1.2.2
 
