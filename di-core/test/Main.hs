@@ -20,6 +20,7 @@ import Data.Function (fix)
 import qualified Data.List as List
 import Data.Monoid (Sum(Sum, getSum))
 import qualified Data.Time.Clock.System as Time
+import GHC.Conc (unsafeIOToSTM)
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 import Test.Tasty.HUnit ((@?=), (@=?))
@@ -154,15 +155,21 @@ tt = Tasty.testGroup "di-core"
           -- Checking that di0 still works
           Di.log di0 1 "n"
 
-  , HU.testCase "STM" $ do
+  , HU.testCase "STM: meta" $ do
        let x = [(2,[],"b"), (3,[],"c")] :: [(Int,[Int],String)]
-           n = 1 :: Int
-       (logs, a) <- withInMemoryDi $ \di0 -> do
+       (logs, _) <- withInMemoryDi $ \di0 -> do
           atomically $
              (Di.log' id di0 1 "a" >> retry) <|>
              (Di.log' id di0 2 "b" >> Di.log' id di0 3 "c")
        -- Check that 'retry' prevents logs from being commited.
        x @=? map logMeta logs
+
+  , HU.testCase "STM: timestamps" $ do
+       (logs, _) <- withInMemoryDi $ \di0 -> do
+          atomically $ do
+            Di.log' id di0 2 "a"
+            threadDelaySTM 100000
+            Di.log' id di0 3 "b"
        -- Check that the timestamps are not all the same.
        2 @=? List.length (List.nub (List.sort (map Di.log_time logs)))
 
@@ -296,3 +303,6 @@ instance QC.Arbitrary Time.SystemTime where
 
 data MyError = MyError !String deriving (Eq, Show)
 instance Ex.Exception MyError
+
+threadDelaySTM :: Int -> STM ()
+threadDelaySTM = unsafeIOToSTM . threadDelay
