@@ -13,7 +13,7 @@ import qualified Control.Exception as Ex (AsyncException(UserInterrupt, ThreadKi
    asyncExceptionFromException, asyncExceptionToException)
 import qualified Control.Exception.Safe as Ex
 import Control.Concurrent.STM
-  (STM, atomically, retry, registerDelay, check, readTVar,
+  (STM, atomically, retry,
    TQueue, newTQueueIO, writeTQueue, tryReadTQueue, flushTQueue)
 import Data.Foldable (for_, toList)
 import Data.Function (fix)
@@ -157,14 +157,10 @@ tt = Tasty.testGroup "di-core"
   , HU.testCase "STM" $ do
        let x = [(2,[],"b"), (3,[],"c")] :: [(Int,[Int],String)]
            n = 1 :: Int
-       tvDelay <- registerDelay 2000 -- 0.2 seconds
        (logs, a) <- withInMemoryDi $ \di0 -> do
           atomically $
              (Di.log' id di0 1 "a" >> retry) <|>
-             (do Di.log' id di0 2 "b"
-                 -- Artificial delay in case clock resolution is too small.
-                 check =<< readTVar tvDelay
-                 Di.log' id di0 3 "c")
+             (Di.log' id di0 2 "b" >> Di.log' id di0 3 "c")
        -- Check that 'retry' prevents logs from being commited.
        x @=? map logMeta logs
        -- Check that the timestamps are not all the same.
@@ -300,4 +296,3 @@ instance QC.Arbitrary Time.SystemTime where
 
 data MyError = MyError !String deriving (Eq, Show)
 instance Ex.Exception MyError
-

@@ -1,8 +1,3 @@
-# Version 1.0.5
-
-* Fix test that failed when clock resolution is too small. See #44.
-
-
 # Version 1.0.4
 
 * Improve exception handling when worker stops.

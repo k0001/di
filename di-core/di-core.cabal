@@ -1,5 +1,5 @@
 name: di-core
-version: 1.0.5
+version: 1.0.4
 author: Renzo Carbonara
 maintainer: renλren.zone
 copyright: Renzo Carbonara 2017
@@ -29,7 +29,6 @@ library
 
 test-suite test
   default-language: Haskell2010
-  ghc-options: -threaded
   type: exitcode-stdio-1.0
   hs-source-dirs: test
   main-is: Main.hs
