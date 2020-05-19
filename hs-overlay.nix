@@ -115,13 +115,13 @@ inherit (pkgs.haskell.lib) doJailbreak;
 in
 self: super:
 {
-  hspec-core = super.callPackage hspec-core {};
-  hspec-discover = super.callPackage hspec-discover {};
-  hspec-meta = super.callPackage hspec-meta {};
-  hspec = super.callPackage hspec {};
-  optparse-applicative = doJailbreak super.optparse-applicative;
-  QuickCheck = super.callPackage QuickCheck {};
-  safe-exceptions = doJailbreak super.safe-exceptions;
+  # hspec-core = super.callPackage hspec-core {};
+  # hspec-discover = super.callPackage hspec-discover {};
+  # hspec-meta = super.callPackage hspec-meta {};
+  # hspec = super.callPackage hspec {};
+  # optparse-applicative = doJailbreak super.optparse-applicative;
+  # QuickCheck = super.callPackage QuickCheck {};
+  # safe-exceptions = doJailbreak super.safe-exceptions;
 
   df1 = super.callPackage ./df1/pkg.nix {};
   di = super.callPackage ./di/pkg.nix {};
