@@ -35,12 +35,8 @@ module Df1
  , T.Message, T.unMessage, T.ToMessage(message)
    -- * Parsing
  , P.parse
-   -- * Rendering
- , R.render
- , R.renderColor
  ) where
 
 import qualified Df1.Parse as P
-import qualified Df1.Render as R
 import qualified Df1.Types as T
 

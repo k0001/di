@@ -19,8 +19,8 @@ bug-reports: https://github.com/k0001/di/issues
 library
   hs-source-dirs: lib
   default-language: Haskell2010
-  exposed-modules: Df1
-  other-modules: Df1.Render Df1.Parse Df1.Types
+  exposed-modules: Df1 Df1.Render
+  other-modules: Df1.Parse Df1.Types
   build-depends:
     attoparsec,
     base >=4.9 && <5.0,
