@@ -40,7 +40,7 @@ tt = Tasty.testGroup "df1"
     QC.testProperty "Color renders the same content" $ do
       QC.forAllShrink QC.arbitrary QC.shrink $ \log0 -> do
          let bl = BB.toLazyByteString (Df1.Render.log log0)
-             blColor = BB.toLazyByteString (Df1.Render.logColor log0)
+             blColor = BB.toLazyByteString (Df1.Render.logColorANSI log0)
          bl === removeAnsiEscapes blColor
   ]
 

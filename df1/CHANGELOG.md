@@ -1,7 +1,7 @@
 # Version ???
 
 * COMPILER ASSISTED BREAKING CHANGE: Change functions names `render` to `log`,
-  `renderColor` to `logColor` and export from  `Df1.Render` instead of `Df1`.
+  `renderColor` to `logColorANSI` and export from  `Df1.Render` instead of `Df1`.
   
 * Exported `key`, `message`, `iso8601`, `segment` and `value` from module 
   `Df1.Render`.

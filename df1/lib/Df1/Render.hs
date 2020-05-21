@@ -5,7 +5,7 @@
 
 module Df1.Render
  ( log
- , logColor
+ , logColorANSI
  , key
  , message
  , iso8601
@@ -38,10 +38,10 @@ import Df1.Types
 
 --------------------------------------------------------------------------------
 
--- | Like 'log', but with ASCII colors.
-logColor :: Log -> BB.Builder
-{-# INLINABLE logColor #-}
-logColor = \log_ ->
+-- | Like 'log', but with ANSI colors.
+logColorANSI :: Log -> BB.Builder
+{-# INLINABLE logColorANSI #-}
+logColorANSI = \log_ ->
  let t = iso8601 (log_time log_) <> space
      pDef = \fg -> renderPathColor fg fgBlue fgCyan (log_path log_)
      pRed = renderPathColor fgBlack fgWhite fgCyan (log_path log_)
