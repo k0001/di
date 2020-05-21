@@ -4,8 +4,13 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Df1.Render
- ( render
- , renderColor
+ ( log
+ , logColorANSI
+ , key
+ , message
+ , iso8601
+ , segment
+ , value
  ) where
 
 import qualified Data.ByteString.Builder as BB
@@ -33,14 +38,14 @@ import Df1.Types
 
 --------------------------------------------------------------------------------
 
--- This is rather ugly, but whatever.
-renderColor :: Log -> BB.Builder
-{-# INLINABLE renderColor #-}
-renderColor = \log_ ->
- let t = renderIso8601 (log_time log_) <> space
+-- | Like 'log', but with ANSI colors.
+logColorANSI :: Log -> BB.Builder
+{-# INLINABLE logColorANSI #-}
+logColorANSI = \log_ ->
+ let t = iso8601 (log_time log_) <> space
      pDef = \fg -> renderPathColor fg fgBlue fgCyan (log_path log_)
      pRed = renderPathColor fgBlack fgWhite fgCyan (log_path log_)
-     m = space <> renderMessage (log_message log_) <> reset
+     m = space <> message (log_message log_) <> reset
  in case log_level log_ of
      Debug -> reset <> t <> pDef fgDefault <> fgDefault <> debug <> m
      Info -> reset <> t <> pDef fgDefault <> fgDefault <> info <> m
@@ -57,14 +62,25 @@ renderColor = \log_ ->
      Emergency ->
        bgRed <> fgBlack <> t <> pRed <> fgWhite <> emergency <> fgBlack <> m
 
--- | Like 'renderColor', but without color.
-render :: Log -> BB.Builder
-{-# INLINABLE render #-}
-render = \x ->
-  renderIso8601 (log_time x) <> space <>
+-- | Renders a 'Log' on its own line. Doesn't include a trailing newline character.
+--
+-- For example:
+--
+-- @
+-- 2019-11-15T18:05:54.949470902Z NOTICE Welcome to my program!
+-- 2019-11-15T18:05:54.949623731Z \/initialization NOTICE Starting web server
+-- 2019-11-15T18:05:54.949630205Z \/initialization ALERT Disk is almost full!!!
+-- 2019-11-15T18:05:54.949640299Z \/server port=80 INFO Listening for new clients
+-- 2019-11-15T18:05:54.949652133Z \/server port=80 \/handler client-address=10.0.0.8 INFO Connection established
+-- 2019-11-15T18:05:54.949664482Z \/server port=80 \/handler client-address=10.0.0.8 WARNING user error (Oops!)
+-- @ 
+log :: Log -> BB.Builder
+{-# INLINABLE log #-}
+log = \x ->
+  iso8601 (log_time x) <> space <>
   renderPath (log_path x) <>
   level (log_level x) <> space <>
-  renderMessage (log_message x)
+  message (log_message x)
 
 -- | @'renderPathColor' a b c p@ renders @p@ using @a@ as the default color (for
 -- things like whitespace or attribute values), @b@ as the color for path names,
@@ -75,27 +91,29 @@ renderPathColor
 {-# INLINE renderPathColor #-}
 renderPathColor defc pathc keyc = fix $ \f -> \case
   ps Seq.:|> Attr k v ->
-    f ps <> defc <> keyc <> renderKey k <>
-    defc <> equals <> renderValue v <> space
-  ps Seq.:|> Push s -> f ps <> defc <> pathc <> slash <> renderSegment s <> space
+    f ps <> defc <> keyc <> key k <>
+    defc <> equals <> value v <> space
+  ps Seq.:|> Push s -> f ps <> defc <> pathc <> slash <> segment s <> space
   Seq.Empty -> mempty
 
 -- | Like 'renderPathColor', but without color.
 renderPath :: Seq.Seq Path -> BB.Builder
 {-# INLINE renderPath #-}
 renderPath = fix $ \f -> \case
-  ps Seq.:|> Attr k v -> f ps <> renderKey k <> equals <> renderValue v <> space
-  ps Seq.:|> Push s -> f ps <> slash <> renderSegment s <> space
+  ps Seq.:|> Attr k v -> f ps <> key k <> equals <> value v <> space
+  ps Seq.:|> Push s -> f ps <> slash <> segment s <> space
   Seq.Empty -> mempty
 
 -- | Escaping rules for 'Segment':
 --
--- * A \'%' anywhere is always percent-escaped (\"%25")"
+-- * A \'%\' anywhere is always percent-escaped (\"%25\")
 --
--- * A 'isControl7' char anywhere is always percent-escaped.
-renderMessage :: Message -> BB.Builder
-{-# INLINE renderMessage #-}
-renderMessage x = eall (unMessage x)
+-- * An ASCII-7 control character anywhere is always percent-escaped. 
+--
+-- The output is encoded as UTF-8.
+message :: Message -> BB.Builder
+{-# INLINE message #-}
+message x = eall (unMessage x)
   where
     {-# INLINE eall #-}
     eall = TL.encodeUtf8BuilderEscaped
@@ -105,15 +123,17 @@ renderMessage x = eall (unMessage x)
 
 -- | Escaping rules for 'Segment':
 --
--- * A 'isPunctuation7' in the first character is always percent-escaped.
+-- * An ASCII-7 punctuation character as first character is always percent-escaped.
 --
--- * A 'isPunctuation7' anywhere else is always percent-escaped, unless it is
---   \'-' or \'_'.
+-- * An ASCII-7 punctuation character anywhere else is always percent-escaped, unless it is
+--   \'-\' or \'_\'.
 --
--- * A 'isControl7' char anywhere is always percent-escaped.
-renderSegment :: Segment -> BB.Builder
-{-# INLINE renderSegment #-}
-renderSegment x = case TL.uncons (unSegment x) of
+-- * An ASCII-7 control character anywhere is always percent-escaped. 
+--
+-- The output is encoded as UTF-8.
+segment :: Segment -> BB.Builder
+{-# INLINE segment #-}
+segment x = case TL.uncons (unSegment x) of
     Nothing -> mempty
     Just (hd,tl) -> ehead (T.singleton hd) <> etail tl
   where
@@ -133,15 +153,17 @@ renderSegment x = case TL.uncons (unSegment x) of
 
 -- | Escaping rules for 'Key':
 --
--- * A 'isControl7' char anywhere is always percent-escaped.
+-- * An ASCII-7 control character is always percent-escaped.
 --
--- * A 'isPunctuation7' in the first character is always percent-escaped.
+-- * An ASCII-7 punctuation character is always percent-escaped.
 --
--- * A 'isPunctuation7' anywhere else is always percent-escaped, unless it is
---   \'-' or \'_'.
-renderKey :: Key -> BB.Builder
-{-# INLINE renderKey #-}
-renderKey x = case TL.uncons (unKey x) of
+-- * An ASCII-7 punctuation character anywhere else is always percent-escaped, unless it is
+--   \'-\' or \'_\'.
+--
+-- The output is encoded as UTF-8.
+key :: Key -> BB.Builder
+{-# INLINE key #-}
+key x = case TL.uncons (unKey x) of
     Nothing -> mempty
     Just (hd,tl) -> ehead (T.singleton hd) <> etail tl
   where
@@ -161,16 +183,18 @@ renderKey x = case TL.uncons (unKey x) of
 
 -- | Escaping rules for 'Value':
 --
--- * A \' ' anywhere is always percent-escaped (\"%20").
+-- * A \' \' anywhere is always percent-escaped (\"%20\").
 --
--- * A \'%' anywhere is always percent-escaped (\"%25")"
+-- * A \'%\' anywhere is always percent-escaped (\"%25\")"
 --
--- * A \'=' anywhere is always percent-escaped (\"%3d").
+-- * A \'=\' anywhere is always percent-escaped (\"%3d\").
 --
--- * A 'isControl7' char anywhere is always percent-escaped.
-renderValue :: Value -> BB.Builder
-{-# INLINE renderValue #-}
-renderValue x = eall (unValue x)
+-- * An ASCII-7 control character anywhere is always percent-escaped.
+--
+-- The output is encoded as UTF-8.
+value :: Value -> BB.Builder
+{-# INLINE value #-}
+value x = eall (unValue x)
   where
     {-# INLINE eall #-}
     eall = TL.encodeUtf8BuilderEscaped
@@ -309,10 +333,10 @@ word8HexPercent = BBP.liftFixedToBounded
 
 -- | Renders /YYYY-MM-DDThh:mm:ss.sssssssssZ/ (nanosecond precision).
 --
--- The rendered string is a 30 characters long, and it's ASCII-encoded.
-renderIso8601 :: Time.SystemTime -> BB.Builder
-{-# INLINE renderIso8601 #-}
-renderIso8601 = \syst ->
+-- The rendered string is 30 characters long, and it's encoded as ASCII/UTF-8.
+iso8601 :: Time.SystemTime -> BB.Builder
+{-# INLINE iso8601 #-}
+iso8601 = \syst ->
   let Time.UTCTime tday tdaytime = Time.systemToUTCTime syst
       (year, month, day) = Time.toGregorian tday
       Time.TimeOfDay hour min' sec = Time.timeToTimeOfDay tdaytime

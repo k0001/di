@@ -77,6 +77,7 @@ import Unsafe.Coerce (unsafeCoerce)
 import qualified Di.Core as Di (Di, Log(Log), log, log', push)
 import qualified Di.Handle as Di (LineRenderer(LineRendererUtf8))
 import qualified Df1
+import qualified Df1.Render
 
 --------------------------------------------------------------------------------
 
@@ -395,8 +396,8 @@ debug' natSTM di = Di.log' natSTM di Df1.Debug . Df1.message
 df1 :: Di.LineRenderer Df1.Level Df1.Path Df1.Message
 {-# INLINE df1 #-}
 df1 = Di.LineRendererUtf8 (\x ->
-  if x then Df1.renderColor . fromDiLog
-       else Df1.render . fromDiLog)
+  if x then Df1.Render.logColorANSI . fromDiLog
+       else Df1.Render.log . fromDiLog)
 
 --------------------------------------------------------------------------------
 

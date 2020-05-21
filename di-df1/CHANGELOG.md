@@ -1,3 +1,7 @@
+# Version ???
+
+* Made compatible with newer `df1`.
+
 # Version 1.2
 
 * COMPILER ASSISTED BREAKING CHANGE: Renaming logging functions again.
