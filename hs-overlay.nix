@@ -10,11 +10,12 @@ in self: super: {
   di-df1 = super.callPackage ./di-df1/pkg.nix { };
   di-handle = super.callPackage ./di-handle/pkg.nix { };
   di-monad = super.callPackage ./di-monad/pkg.nix { };
+  df1-html = super.callCabal2nix "df1-html" ./df1-html {};
 
   _shell = self.shellFor {
     withHoogle = true; # hoogle dependencies don't compile
     packages = p: [
-      p.df1 p.di p.di-core p.di-df1 p.di-handle p.di-monad
+      p.df1 p.di p.di-core p.di-df1 p.di-handle p.di-monad p.df1-html
     ];
   };
 }
