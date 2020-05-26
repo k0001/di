@@ -1,0 +1,63 @@
+.df1-theme-solarized-dark .df1-log {
+    font-family: monospace;
+}
+
+.df1-theme-solarized-dark .df1-debug,
+.df1-theme-solarized-dark .df1-info,
+.df1-theme-solarized-dark .df1-notice,
+.df1-theme-solarized-dark .df1-warning {
+   background-color: #002b36;
+   color: #93a1a1;
+}
+
+.df1-theme-solarized-dark .df1-debug .df1-push,
+.df1-theme-solarized-dark .df1-info .df1-push,
+.df1-theme-solarized-dark .df1-notice .df1-push,
+.df1-theme-solarized-dark .df1-warning .df1-push,
+.df1-theme-solarized-dark .df1-error .df1-push {
+    color: #268bd2;
+}
+
+.df1-theme-solarized-dark .df1-debug .df1-key,
+.df1-theme-solarized-dark .df1-info .df1-key,
+.df1-theme-solarized-dark .df1-notice .df1-key,
+.df1-theme-solarized-dark .df1-warning .df1-key,
+.df1-theme-solarized-dark .df1-error .df1-key,
+.df1-theme-solarized-dark .df1-critical .df1-key,
+.df1-theme-solarized-dark .df1-alert .df1-key,
+.df1-theme-solarized-dark .df1-emergency .df1-key  {
+    color: #2aa198;
+}
+
+.df1-theme-solarized-dark .df1-notice .df1-level {
+    color: #859900;
+}
+
+.df1-theme-solarized-dark .df1-warning .df1-level {
+    color: #b58900;
+}
+
+.df1-theme-solarized-dark .df1-error {
+    background-color: #fdf6e3;
+    color: #002b36;
+}
+
+.df1-theme-solarized-dark .df1-error .df1-level {
+    color: #dc322f;
+}
+
+.df1-theme-solarized-dark .df1-critical, 
+.df1-theme-solarized-dark .df1-alert, 
+.df1-theme-solarized-dark .df1-emergency {
+    background-color: #dc322f;
+    color: #002b36;
+}
+
+.df1-theme-solarized-dark .df1-critical .df1-push,
+.df1-theme-solarized-dark .df1-alert .df1-push,
+.df1-theme-solarized-dark .df1-emergency .df1-push,
+.df1-theme-solarized-dark .df1-critical .df1-level, 
+.df1-theme-solarized-dark .df1-alert .df1-level, 
+.df1-theme-solarized-dark .df1-emergency .df1-level {
+    color: #fdf6e3;
+}

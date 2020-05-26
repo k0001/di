@@ -1,0 +1,56 @@
+name: df1-html
+version: 0.1
+author: Melisa Laura Diaz
+maintainer: renλren.zone
+copyright: Renzo Carbonara 2020
+license: BSD3
+license-file: LICENSE.txt
+extra-source-files: 
+  README.md
+  CHANGELOG.md
+  theme-solarized-dark.css
+  theme-solarized-dark.png
+  theme-solarized-light.css
+  theme-solarized-light.png
+category: Logging
+build-type: Simple
+cabal-version: >=1.18
+synopsis: Render and parse df1 logs as HTML
+description: Render and parse df1 logs as HTML
+homepage: https://github.com/k0001/di
+bug-reports: https://github.com/k0001/di/issues
+
+library
+  hs-source-dirs: lib
+  default-language: Haskell2010
+  exposed-modules: Df1.Html.Render, Df1.Html.Parse
+  build-depends:
+    attoparsec,
+    base >=4.9 && <5.0,
+    bytestring,
+    containers,
+    df1,
+    text,
+    time,
+    xmlbf
+  ghcjs-options: -Wall -O3
+  ghc-options: -Wall -O2
+
+test-suite test
+  default-language: Haskell2010
+  ghc-options: -threaded
+  type: exitcode-stdio-1.0
+  hs-source-dirs: test
+  main-is: Main.hs
+  build-depends:
+    base,
+    containers,
+    df1,
+    df1-html,
+    QuickCheck,
+    tasty,
+    tasty-hunit,
+    tasty-quickcheck,
+    text,
+    time,    
+    xmlbf
