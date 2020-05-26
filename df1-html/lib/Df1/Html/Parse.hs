@@ -40,12 +40,12 @@ attrClass t = do
 parseTime :: X.Parser TL.Text
 parseTime = X.pElement "span" $ do 
   attrClass "df1-time"
-  X.pText <|> pure ""
+  X.pText
 
 parseLevel :: X.Parser TL.Text
 parseLevel = X.pElement "span" $ do 
   attrClass "df1-level"
-  X.pText <|> pure ""
+  X.pText
 
 parsePaths :: X.Parser TL.Text
 parsePaths = X.pElement "span" $ do 
@@ -55,7 +55,7 @@ parsePaths = X.pElement "span" $ do
 parsePush :: X.Parser TL.Text
 parsePush = X.pElement "span" $ do
   attrClass "df1-push"
-  t <- X.pText <|> pure ""
+  t <- X.pText
   s <- parseSeg
   pure (t <> s)
 
@@ -68,7 +68,7 @@ parseAttr :: X.Parser TL.Text
 parseAttr = X.pElement "span" $ do
   attrClass "df1-attr"
   k <- parseKey
-  eq <- X.pText <|> pure ""
+  eq <- X.pText
   v <- parseValue
   pure (k <> eq <> v)
 
