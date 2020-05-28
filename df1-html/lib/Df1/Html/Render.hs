@@ -128,10 +128,14 @@ spanClass t = X.element "span" [("class", t)]
 -- 
 -- If you need to style the rendered HTML, you can use some of the themes shipped with this library.
 -- 
--- == [theme-solarized-dark.css](https://github.com/k0001/di/blob/html/df1-html/theme-solarized-dark.css?raw=true)
+-- == [theme-solarized-dark.css](https://raw.githubusercontent.com/k0001/di/master/df1-html/theme-solarized-dark.css)
 --
--- ![theme-solarized-dark](https://github.com/k0001/di/blob/html/df1-html/theme-solarized-dark.png?raw=true)
+-- To use this theme, wrap the @.df1-log@ elements in a @.df1-theme-solarized-dark@ element.
 --
--- == [theme-solarized-light.css](https://github.com/k0001/di/blob/html/df1-html/theme-solarized-light.css?raw=true)
+-- ![theme-solarized-dark](https://raw.githubusercontent.com/k0001/di/master/df1-html/theme-solarized-dark.png)
 --
--- ![theme-solarized-light](https://github.com/k0001/di/blob/html/df1-html/theme-solarized-light.png?raw=true)
+-- == [theme-solarized-light.css](https://raw.githubusercontent.com/k0001/di/master/df1-html/theme-solarized-light.css)
+--
+-- To use this theme, wrap the @.df1-log@ elements in a @.df1-theme-solarized-light@ element.
+--
+-- ![theme-solarized-light](https://raw.githubusercontent.com/k0001/di/master/df1-html/theme-solarized-light.png)
