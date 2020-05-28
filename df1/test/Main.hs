@@ -19,6 +19,7 @@ import qualified Test.Tasty.Runners as Tasty
 
 import qualified Df1
 import qualified Df1.Render
+import qualified Df1.Parse
 
 --------------------------------------------------------------------------------
 
@@ -34,7 +35,7 @@ tt = Tasty.testGroup "df1"
     QC.testProperty "Render/Parse roundtrip" $ do
       QC.forAllShrink QC.arbitrary QC.shrink $ \log0 -> do
          let bl = BB.toLazyByteString (Df1.Render.log log0)
-         Right log0 === ABL.eitherResult (ABL.parse Df1.parse bl)
+         Right log0 === ABL.eitherResult (ABL.parse Df1.Parse.log bl)
 
   , Tasty.localOption (QC.QuickCheckTests 2000) $
     QC.testProperty "Color renders the same content" $ do

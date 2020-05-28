@@ -33,10 +33,7 @@ module Df1
  , T.Key, T.unKey, T.ToKey(key)
  , T.Value, T.unValue, T.ToValue(value)
  , T.Message, T.unMessage, T.ToMessage(message)
-   -- * Parsing
- , P.parse
  ) where
 
-import qualified Df1.Parse as P
 import qualified Df1.Types as T
 

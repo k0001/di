@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Df1.Parse
- ( parse
+ ( log
  ) where
 
 import Control.Applicative ((<|>), many, empty)
@@ -19,6 +19,7 @@ import qualified Data.Text.Lazy.Encoding as TL
 import qualified Data.Time as Time
 import qualified Data.Time.Clock.System as Time
 import Data.Word (Word8, Word16, Word32)
+import Prelude hiding (log)
 
 import Df1.Types
  (Log(Log, log_time, log_level, log_path, log_message),
@@ -33,9 +34,9 @@ import Df1.Types
 
 -- | If sucessful, parsing will stop after the first CR or LF newline marker if
 -- any, otherwise it will consume all input.
-parse :: AB.Parser Log
-{-# INLINABLE parse #-}
-parse = (AB.<?> "parse") $ do
+log :: AB.Parser Log
+{-# INLINABLE log #-}
+log = (AB.<?> "log") $ do
   t <- AB.skipWhile (== 32) *> pIso8601 -- :space:
   p <- AB.skipWhile (== 32) *> pPath
   l <- AB.skipWhile (== 32) *> pLevel
