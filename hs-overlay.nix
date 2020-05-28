@@ -10,7 +10,7 @@ in self: super: {
   di-df1 = super.callPackage ./di-df1/pkg.nix { };
   di-handle = super.callPackage ./di-handle/pkg.nix { };
   di-monad = super.callPackage ./di-monad/pkg.nix { };
-  df1-html = super.callCabal2nix "df1-html" ./df1-html {};
+  df1-html = super.callPackage ./df1-html/pkg.nix { };
 
   _shell = self.shellFor {
     withHoogle = true; # hoogle dependencies don't compile
