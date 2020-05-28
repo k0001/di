@@ -3,7 +3,7 @@
 }:
 mkDerivation {
   pname = "di-df1";
-  version = "1.2";
+  version = "1.2.1";
   src = ./.;
   libraryHaskellDepends = [
     base df1 di-core di-handle di-monad stm
