@@ -2,10 +2,14 @@
 
 * Add `ToPath`, `path`.
 
-* Add `ToValue` instances for `base`'s `Fixed`; for `time`'s `SystemTime`, 
-  `UTCTime`, `CalendarDiffDays`, `CalendarDiffTime`, `Day`, `TimeZone`, 
-  `TimeOfDay`, `LocalTime`, `ZonedTime`, `NominalDiffTime`, `DiffTime`, 
-  `DayOfWeek`.
+* Add `ToValue` instances for `base`'s `Char`, `Fixed`; for `time`'s
+  `SystemTime`, `UTCTime`, `CalendarDiffDays`, `CalendarDiffTime`, `Day`,
+  `TimeZone`, `TimeOfDay`, `LocalTime`, `ZonedTime`, `NominalDiffTime`,
+  `DiffTime`, `DayOfWeek`.
+
+* Add `ToSegment` instances for `base`'s `Char`.
+
+* Add `ToKey` instances for `base`'s `Char`.
 
 # Version 0.4
 

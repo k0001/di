@@ -244,6 +244,10 @@ instance ToSegment String where
   segment = Segment . TL.pack
   {-# INLINE segment #-}
 
+instance ToSegment Char where
+  segment = Segment . TL.singleton
+  {-# INLINE segment #-}
+
 --------------------------------------------------------------------------------
 
 -- | An attribute key (see 'Attr').
@@ -318,6 +322,10 @@ instance ToKey T.Text where
 -- @
 instance ToKey String where
   key = Key . TL.pack
+  {-# INLINE key #-}
+
+instance ToKey Char where
+  key = Key . TL.singleton
   {-# INLINE key #-}
 
 --------------------------------------------------------------------------------
@@ -399,11 +407,12 @@ instance ToValue String where
 instance ToValue SomeException where
   value = value . show
   {-# INLINE value #-}
-
 instance ToValue Bool where
-  value = \b -> if b then Value "true" else Value "false"
+  value = \b -> if b then "true" else "false"
   {-# INLINE value #-}
-
+instance ToValue Char where
+  value = Value . TL.singleton
+  {-# INLINE value #-}
 instance ToValue Int where
   value = value . show
   {-# INLINE value #-}
