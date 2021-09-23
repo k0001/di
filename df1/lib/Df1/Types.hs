@@ -6,7 +6,7 @@
 module Df1.Types
  ( Log(Log, log_time, log_level, log_path, log_message)
  , Level(Debug, Info, Notice, Warning, Error, Critical, Alert, Emergency)
- , Path(Attr, Push)
+ , Path(Attr, Push), ToPath(path)
  , Segment, unSegment, ToSegment(segment)
  , Key, unKey, ToKey(key)
  , Value, unValue, ToValue(value)
@@ -14,6 +14,7 @@ module Df1.Types
  ) where
 
 import Control.Exception (SomeException)
+import Data.Foldable (toList)
 import Data.Semigroup (Semigroup((<>)))
 import Data.Sequence as Seq
 import qualified Data.Text as T
@@ -474,3 +475,30 @@ data Path
   | Attr !Key !Value
   deriving (Eq, Show)
 
+-- | Convert an arbitrary type to a 'Seq'uence of 'Path's.
+--
+-- You are encouraged to create custom 'ToPath' instances for your types
+-- making sure you avoid rendering sensitive details such as passwords, so that
+-- they don't accidentally end up in logs.
+--
+-- Any characters that need to be escaped for rendering will be automatically
+-- escaped at rendering time. You don't need to escape them here.
+class ToPath a where
+  -- | The leftmost 'Path' is the closest to the root. The rightmost 'Path' is
+  -- the one closest to where the log was generated.
+  --
+  -- See the documentation for 'Path'.
+  path :: a -> Seq.Seq Path
+
+-- | Identity.
+instance ToPath (Seq.Seq Path) where
+  path = id
+  {-# INLINE path #-}
+
+-- |
+-- @
+-- 'path' = 'Seq.fromList' . 'toList'
+-- @
+instance {-# OVERLAPPABLE #-} Foldable f => ToPath (f Path) where
+  path = Seq.fromList . toList
+  {-# INLINE path #-}

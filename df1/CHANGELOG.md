@@ -1,3 +1,8 @@
+# Version 0.4.1
+
+* Add `ToPath`, `path`.
+
+
 # Version 0.4
 
 * COMPILER ASSISTED BREAKING CHANGE: Change functions names `Df1.render` to
