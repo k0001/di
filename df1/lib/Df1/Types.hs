@@ -14,6 +14,7 @@ module Df1.Types
  ) where
 
 import Control.Exception (SomeException)
+import qualified Data.Fixed as Fixed
 import Data.Foldable (toList)
 import Data.Semigroup (Semigroup((<>)))
 import Data.Sequence as Seq
@@ -23,7 +24,9 @@ import Data.Int (Int8, Int16, Int32, Int64)
 import Data.Word (Word8, Word16, Word32, Word64)
 import Numeric.Natural (Natural)
 import Data.String (IsString(fromString))
+import qualified Data.Time as Time
 import qualified Data.Time.Clock.System as Time
+import qualified Data.Time.Format.ISO8601 as Time
 
 --------------------------------------------------------------------------------
 
@@ -443,6 +446,56 @@ instance ToValue Float where
 instance ToValue Double where
   value = value . show
   {-# INLINE value #-}
+-- | Chops trailing zeros.
+instance Fixed.HasResolution a => ToValue (Fixed.Fixed a) where
+  value = value . Fixed.showFixed True
+  {-# INLINE value #-}
+-- | See 'Time.ISO8601'.
+instance ToValue Time.CalendarDiffDays where
+  value = value . Time.iso8601Show
+  {-# INLINE value #-}
+-- | See 'Time.ISO8601'.
+instance ToValue Time.CalendarDiffTime where
+  value = value . Time.iso8601Show
+  {-# INLINE value #-}
+-- | See 'Time.ISO8601'.
+instance ToValue Time.Day where
+  value = value . Time.iso8601Show
+  {-# INLINE value #-}
+-- | See 'Time.ISO8601'.
+instance ToValue Time.TimeZone where
+  value = value . Time.iso8601Show
+  {-# INLINE value #-}
+-- | See 'Time.ISO8601'.
+instance ToValue Time.TimeOfDay where
+  value = value . Time.iso8601Show
+  {-# INLINE value #-}
+-- | See 'Time.ISO8601'.
+instance ToValue Time.LocalTime where
+  value = value . Time.iso8601Show
+  {-# INLINE value #-}
+-- | See 'Time.ISO8601'.
+instance ToValue Time.ZonedTime where
+  value = value . Time.iso8601Show
+  {-# INLINE value #-}
+-- | @123456s@
+instance ToValue Time.NominalDiffTime where
+  value = value . show
+  {-# INLINE value #-}
+-- | @123456s@
+instance ToValue Time.DiffTime where
+  value = value . show
+  {-# INLINE value #-}
+-- | Lowercase @monday@, @tuesday@, etc.
+instance ToValue Time.DayOfWeek where
+   value = \x -> case x of
+     Time.Monday    -> "monday"
+     Time.Tuesday   -> "tuesday"
+     Time.Wednesday -> "wednesday"
+     Time.Thursday  -> "thursday"
+     Time.Friday    -> "friday"
+     Time.Saturday  -> "saturday"
+     Time.Sunday    -> "sunday"
 
 --------------------------------------------------------------------------------
 

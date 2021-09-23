@@ -2,6 +2,10 @@
 
 * Add `ToPath`, `path`.
 
+* Add `ToValue` instances for `base`'s `Fixed`; for `time`'s `SystemTime`, 
+  `UTCTime`, `CalendarDiffDays`, `CalendarDiffTime`, `Day`, `TimeZone`, 
+  `TimeOfDay`, `LocalTime`, `ZonedTime`, `NominalDiffTime`, `DiffTime`, 
+  `DayOfWeek`.
 
 # Version 0.4
 

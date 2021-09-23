@@ -2,6 +2,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 
 module Df1.Render
  ( log
@@ -33,8 +34,9 @@ import Df1.Types
   Path(Attr, Push),
   Segment, unSegment,
   Key, unKey,
-  Value, unValue,
+  Value, unValue, ToValue,
   Message, unMessage)
+import qualified Df1.Types (value)
 
 --------------------------------------------------------------------------------
 
@@ -336,9 +338,20 @@ word8HexPercent = BBP.liftFixedToBounded
 -- The rendered string is 30 characters long, and it's encoded as ASCII/UTF-8.
 iso8601 :: Time.SystemTime -> BB.Builder
 {-# INLINE iso8601 #-}
-iso8601 = \syst ->
-  let Time.UTCTime tday tdaytime = Time.systemToUTCTime syst
-      (year, month, day) = Time.toGregorian tday
+iso8601 syst =
+  iso8601SystemTimeUTCTime syst (Time.systemToUTCTime syst)
+
+-- | Like 'iso8601', but takes a 'Time.UTCTime'.
+iso8601UTCTime :: Time.UTCTime -> BB.Builder
+{-# INLINE iso8601UTCTime #-}
+iso8601UTCTime utct =
+  iso8601SystemTimeUTCTime (Time.utcToSystemTime utct) utct
+
+-- | INTERNAL. Used by 'iso8601' and 'iso8601UTCTime'.
+iso8601SystemTimeUTCTime :: Time.SystemTime -> Time.UTCTime -> BB.Builder
+{-# INLINE iso8601SystemTimeUTCTime #-}
+iso8601SystemTimeUTCTime syst (Time.UTCTime tday tdaytime) =
+  let (year, month, day) = Time.toGregorian tday
       Time.TimeOfDay hour min' sec = Time.timeToTimeOfDay tdaytime
   in -- Notice that 'TB.decimal' RULES dispatch to faster code for smaller
      -- types (e.g., 'Word8' is faster to render than 'Int'), so we make
@@ -402,3 +415,16 @@ isPunctuation7 w =
 isControl7 :: Word8 -> Bool
 {-# INLINE isControl7 #-}
 isControl7 w = (w <= 31) || (w == 127)
+
+--------------------------------------------------------------------------------
+
+-- | See 'iso8601'.
+instance ToValue Time.SystemTime where
+  value = Df1.Types.value . TL.decodeUtf8 . BB.toLazyByteString . iso8601
+  {-# NOINLINE value #-}
+
+-- | See 'iso8601'.
+instance ToValue Time.UTCTime where
+  value = Df1.Types.value . TL.decodeUtf8 . BB.toLazyByteString . iso8601UTCTime
+  {-# NOINLINE value #-}
+
