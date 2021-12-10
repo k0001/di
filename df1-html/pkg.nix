@@ -1,6 +1,6 @@
-{ mkDerivation, attoparsec, base, bytestring, containers, df1
-, QuickCheck, stdenv, tasty, tasty-hunit, tasty-quickcheck, text
-, time, xmlbf
+{ mkDerivation, attoparsec, base, bytestring, containers, df1, lib
+, QuickCheck, tasty, tasty-hunit, tasty-quickcheck, text, time
+, xmlbf
 }:
 mkDerivation {
   pname = "df1-html";
@@ -15,5 +15,5 @@ mkDerivation {
   ];
   homepage = "https://github.com/k0001/di";
   description = "Render and parse df1 logs as HTML";
-  license = stdenv.lib.licenses.bsd3;
+  license = lib.licenses.bsd3;
 }

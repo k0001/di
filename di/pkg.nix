@@ -1,5 +1,5 @@
 { mkDerivation, base, containers, df1, di-core, di-df1, di-handle
-, di-monad, exceptions, stdenv
+, di-monad, exceptions, lib
 }:
 mkDerivation {
   pname = "di";
@@ -10,5 +10,5 @@ mkDerivation {
   ];
   homepage = "https://github.com/k0001/di";
   description = "Typeful hierarchical structured logging using di, mtl and df1";
-  license = stdenv.lib.licenses.bsd3;
+  license = lib.licenses.bsd3;
 }

@@ -1,5 +1,5 @@
-{ mkDerivation, base, containers, di-core, exceptions, mtl, pipes
-, stdenv, stm, transformers
+{ mkDerivation, base, containers, di-core, exceptions, lib, mtl
+, pipes, stm, transformers
 }:
 mkDerivation {
   pname = "di-monad";
@@ -10,5 +10,5 @@ mkDerivation {
   ];
   homepage = "https://github.com/k0001/di";
   description = "mtl flavoured typeful hierarchical structured logging for di-core";
-  license = stdenv.lib.licenses.bsd3;
+  license = lib.licenses.bsd3;
 }
