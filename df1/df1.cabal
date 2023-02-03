@@ -8,7 +8,7 @@ license-file: LICENSE.txt
 extra-source-files: README.md CHANGELOG.md
 category: Logging
 build-type: Simple
-cabal-version: >=1.18
+cabal-version: 1.18
 synopsis: Type, render and parse the df1 hierarchical structured log format
 description:
   Type, render and parse logs in /df1/ format, a hierarchical structured
