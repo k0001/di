@@ -11,6 +11,9 @@
 
 * Add `ToKey` instances for `base`'s `Char`.
 
+* Add `Read` instance for `Level`.
+
+
 # Version 0.4
 
 * COMPILER ASSISTED BREAKING CHANGE: Change functions names `Df1.render` to
