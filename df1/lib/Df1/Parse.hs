@@ -21,6 +21,8 @@ import qualified Data.Time.Clock.System as Time
 import Data.Word (Word8, Word16, Word32)
 import Prelude hiding (log)
 
+import Df1.Render () -- To make sure module instances are available here too.
+
 import Df1.Types
  (Log(Log, log_time, log_level, log_path, log_message),
   Level(Debug, Info, Notice, Warning, Error, Critical, Alert, Emergency),

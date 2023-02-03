@@ -14,6 +14,7 @@ module Df1.Types
  ) where
 
 import Control.Exception (SomeException)
+import Data.Coerce (coerce)
 import qualified Data.Fixed as Fixed
 import Data.Foldable (toList)
 import Data.Semigroup (Semigroup((<>)))
@@ -70,7 +71,7 @@ newtype Message = Message TL.Text
   deriving (Eq, Show)
 
 unMessage :: Message -> TL.Text
-unMessage = \(Message x) -> x
+unMessage = coerce
 {-# INLINE unMessage #-}
 
 instance IsString Message where
@@ -78,14 +79,12 @@ instance IsString Message where
   {-# INLINE fromString #-}
 
 instance Semigroup Message where
-  (<>) (Message a) (Message b) = Message (a <> b)
+  (<>) = coerce ((<>) :: TL.Text -> TL.Text -> TL.Text)
   {-# INLINE (<>) #-}
 
 instance Monoid Message where
   mempty = Message mempty
   {-# INLINE mempty #-}
-  mappend (Message a) (Message b) = Message (mappend a b)
-  {-# INLINE mappend #-}
 
 -- | Convert an arbitrary type to a 'Message'.
 --
@@ -187,7 +186,7 @@ newtype Segment = Segment TL.Text
   deriving (Eq, Show)
 
 unSegment :: Segment -> TL.Text
-unSegment = \(Segment x) -> x
+unSegment = coerce
 {-# INLINE unSegment #-}
 
 instance IsString Segment where
@@ -195,14 +194,12 @@ instance IsString Segment where
   {-# INLINE fromString #-}
 
 instance Semigroup Segment where
-  (<>) (Segment a) (Segment b) = Segment (a <> b)
+  (<>) = coerce ((<>) :: TL.Text -> TL.Text -> TL.Text)
   {-# INLINE (<>) #-}
 
 instance Monoid Segment where
   mempty = Segment mempty
   {-# INLINE mempty #-}
-  mappend (Segment a) (Segment b) = Segment (mappend a b)
-  {-# INLINE mappend #-}
 
 -- | Convert an arbitrary type to a 'Segment'.
 --
@@ -267,7 +264,7 @@ newtype Key = Key TL.Text
   deriving (Eq, Show)
 
 unKey :: Key -> TL.Text
-unKey = \(Key x) -> x
+unKey = coerce
 {-# INLINE unKey #-}
 
 instance IsString Key where
@@ -275,14 +272,12 @@ instance IsString Key where
   {-# INLINE fromString #-}
 
 instance Semigroup Key where
-  (<>) (Key a) (Key b) = Key (a <> b)
+  (<>) = coerce ((<>) :: TL.Text -> TL.Text -> TL.Text)
   {-# INLINE (<>) #-}
 
 instance Monoid Key where
   mempty = Key mempty
   {-# INLINE mempty #-}
-  mappend (Key a) (Key b) = Key (mappend a b)
-  {-# INLINE mappend #-}
 
 -- | Convert an arbitrary type to a 'Key'.
 --
@@ -347,7 +342,7 @@ newtype Value = Value TL.Text
   deriving (Eq, Show)
 
 unValue :: Value -> TL.Text
-unValue = \(Value x) -> x
+unValue = coerce
 {-# INLINE unValue #-}
 
 instance IsString Value where
@@ -355,14 +350,12 @@ instance IsString Value where
   {-# INLINE fromString #-}
 
 instance Semigroup Value where
-  (<>) (Value a) (Value b) = Value (a <> b)
+  (<>) = coerce ((<>) :: TL.Text -> TL.Text -> TL.Text)
   {-# INLINE (<>) #-}
 
 instance Monoid Value where
   mempty = Value mempty
   {-# INLINE mempty #-}
-  mappend (Value a) (Value b) = Value (mappend a b)
-  {-# INLINE mappend #-}
 
 -- | Convert an arbitrary type to a 'Value'.
 --

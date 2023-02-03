@@ -17,7 +17,7 @@ module Df1.Render
 import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Builder.Prim as BBP
 import Data.Function (fix)
-import Data.Monoid ((<>))
+import Data.Semigroup ((<>))
 import qualified Data.Sequence as Seq
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
@@ -75,7 +75,7 @@ logColorANSI = \log_ ->
 -- 2019-11-15T18:05:54.949640299Z \/server port=80 INFO Listening for new clients
 -- 2019-11-15T18:05:54.949652133Z \/server port=80 \/handler client-address=10.0.0.8 INFO Connection established
 -- 2019-11-15T18:05:54.949664482Z \/server port=80 \/handler client-address=10.0.0.8 WARNING user error (Oops!)
--- @ 
+-- @
 log :: Log -> BB.Builder
 {-# INLINABLE log #-}
 log = \x ->
@@ -110,7 +110,7 @@ renderPath = fix $ \f -> \case
 --
 -- * A \'%\' anywhere is always percent-escaped (\"%25\")
 --
--- * An ASCII-7 control character anywhere is always percent-escaped. 
+-- * An ASCII-7 control character anywhere is always percent-escaped.
 --
 -- The output is encoded as UTF-8.
 message :: Message -> BB.Builder
@@ -130,7 +130,7 @@ message x = eall (unMessage x)
 -- * An ASCII-7 punctuation character anywhere else is always percent-escaped, unless it is
 --   \'-\' or \'_\'.
 --
--- * An ASCII-7 control character anywhere is always percent-escaped. 
+-- * An ASCII-7 control character anywhere is always percent-escaped.
 --
 -- The output is encoded as UTF-8.
 segment :: Segment -> BB.Builder

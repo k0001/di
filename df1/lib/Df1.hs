@@ -35,5 +35,9 @@ module Df1
  , T.Message, T.unMessage, T.ToMessage(message)
  ) where
 
+import Df1.Render () -- To make sure module instances are available here too.
+import Df1.Parse ()  -- To make sure module instances are available here too.
+
 import qualified Df1.Types as T
+
 
