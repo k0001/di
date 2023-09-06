@@ -1,3 +1,8 @@
+# Version 0.4.2
+
+* Remove a lot of inlining to make compilation faster.
+
+
 # Version 0.4.1
 
 * Add `ToPath`, `path`.

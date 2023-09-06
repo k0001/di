@@ -37,7 +37,6 @@ import Df1.Types
 -- | If sucessful, parsing will stop after the first CR or LF newline marker if
 -- any, otherwise it will consume all input.
 log :: AB.Parser Log
-{-# INLINABLE log #-}
 log = (AB.<?> "log") $ do
   t <- AB.skipWhile (== 32) *> pIso8601 -- :space:
   p <- AB.skipWhile (== 32) *> pPath
@@ -47,7 +46,6 @@ log = (AB.<?> "log") $ do
             , log_level = l, log_path = p, log_message = m })
 
 pIso8601 :: AB.Parser Time.UTCTime
-{-# INLINABLE pIso8601 #-}
 pIso8601 = (AB.<?> "pIso8601") $ do
   year <- (pNum4Digits AB.<?> "year") <* (AB.skip (== 45) AB.<?> "-")
   month <- (pNum2Digits AB.<?> "month") <* (AB.skip (== 45) AB.<?> "-")
@@ -64,16 +62,13 @@ pIso8601 = (AB.<?> "pIso8601") $ do
   pure (Time.UTCTime tday (Time.timeOfDayToTime ttod))
 
 pNum1Digit :: AB.Parser Word8
-{-# INLINE pNum1Digit #-}
 pNum1Digit = AB.satisfyWith (subtract 48) (< 10) AB.<?> "pNum1Digit"
 
 pNum2Digits :: AB.Parser Word8
-{-# INLINE pNum2Digits #-}
 pNum2Digits = (AB.<?> "pNum2Digits") $ do
   (+) <$> fmap (* 10) pNum1Digit <*> pNum1Digit
 
 pNum4Digits :: AB.Parser Word16
-{-# INLINE pNum4Digits #-}
 pNum4Digits = (AB.<?> "pNum4Digits") $ do
   (\a b c d -> a + b + c + d)
      <$> fmap ((* 1000) . fromIntegral) pNum1Digit
@@ -82,7 +77,6 @@ pNum4Digits = (AB.<?> "pNum4Digits") $ do
           <*> fmap fromIntegral pNum1Digit
 
 pNum9Digits :: AB.Parser Word32
-{-# INLINE pNum9Digits #-}
 pNum9Digits = (AB.<?> "pNum9Digits") $ do
   (\a b c d e f g h i -> a + b + c + d + e + f + g + h + i)
      <$> fmap ((* 100000000) . fromIntegral) pNum1Digit
@@ -96,7 +90,6 @@ pNum9Digits = (AB.<?> "pNum9Digits") $ do
      <*> fmap fromIntegral pNum1Digit
 
 pLevel :: AB.Parser Level
-{-# INLINE pLevel #-}
 pLevel = (AB.<?> "pLevel")
   -- In decreasing frequency we expect logs to happen.
   -- We expect 'Debug' to mostly be muted, so 'Info' is prefered.
@@ -110,17 +103,14 @@ pLevel = (AB.<?> "pLevel")
   (AB.string "EMERGENCY" $> Emergency)
 
 pPath :: AB.Parser (Seq.Seq Path)
-{-# INLINABLE pPath #-}
 pPath = (AB.<?> "pPath") $ do
     fix (\k ps -> ((pPush <|> pAttr) >>= \p -> k (ps Seq.|> p)) <|> pure ps)
         mempty
   where
-    {-# INLINE pPush #-}
     pPush :: AB.Parser Path
     pPush = (AB.<?> "pPush") $ do
       seg <- pSegment <* AB.skipWhile (== 32)
       pure (Push seg)
-    {-# INLINE pAttr #-}
     pAttr :: AB.Parser Path
     pAttr = do
       k <- pKey <* AB.skip (== 61)
@@ -145,21 +135,18 @@ pValue = (AB.<?> "pValue") $ do
   pure (value bl)
 
 pMessage :: AB.Parser Message
-{-# INLINE pMessage #-}
 pMessage = (AB.<?> "pMessage") $ do
   b <- AB.takeWhile (\w -> w /= 10 && w /= 13) -- CR and LF
   tl <- pUtf8LtoL =<< pDecodePercents b
   pure (message tl)
 
 pUtf8LtoL :: BL.ByteString -> AB.Parser TL.Text
-{-# INLINE pUtf8LtoL #-}
 pUtf8LtoL = \bl -> case TL.decodeUtf8' bl of
    Right x -> pure x
    Left e -> fail (show e) AB.<?> "pUtf8LtoL"
 
 -- | Parse @\"%FF\"@. Always consumes 3 bytes from the input, if successful.
 pNumPercent :: AB.Parser Word8
-{-# INLINE pNumPercent #-}
 pNumPercent = (AB.<?> "pNum2Nibbles") $ do
    AB.skip (== 37) -- percent
    wh <- pHexDigit
@@ -167,7 +154,6 @@ pNumPercent = (AB.<?> "pNum2Nibbles") $ do
    pure (shiftL wh 4 + wl)
 
 pHexDigit :: AB.Parser Word8
-{-# INLINE pHexDigit #-}
 pHexDigit = AB.satisfyWith
   (\case w | w >= 48 && w <=  57 -> w - 48
            | w >= 65 && w <=  70 -> w - 55
@@ -177,14 +163,12 @@ pHexDigit = AB.satisfyWith
 
 -- | Like 'pDecodePercentsL' but takes strict bytes.
 pDecodePercents :: B.ByteString -> AB.Parser BL.ByteString
-{-# INLINE pDecodePercents #-}
 pDecodePercents = pDecodePercentsL . BL.fromStrict
 
 -- | Decodes all 'pNumPercent' occurences from the given input.
 --
 -- TODO: Make faster and more space efficient.
 pDecodePercentsL :: BL.ByteString -> AB.Parser BL.ByteString
-{-# INLINABLE pDecodePercentsL #-}
 pDecodePercentsL = \bl ->
     either fail pure (ABL.eitherResult (ABL.parse p bl))
   where
