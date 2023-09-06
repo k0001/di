@@ -8,8 +8,10 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_HADDOCK not-home #-}
+{-# OPTIONS_GHC -Wno-unused-imports #-}
 
 -- | This module offers a monadic alternative to the “bare” logging API offered
 -- by "Di.Core".
@@ -67,6 +69,7 @@ import Control.Monad.Except (ExceptT(ExceptT), MonadError)
 import Control.Monad.Fail (MonadFail)
 import Control.Monad.Fix (MonadFix)
 import Control.Monad.IO.Class (MonadIO, liftIO)
+import Control.Monad.IO.Unlift (MonadUnliftIO)
 import Control.Monad (MonadPlus)
 import Control.Monad.Reader (ReaderT(ReaderT), MonadReader)
 import qualified Control.Monad.Reader as Reader
@@ -86,6 +89,7 @@ import Data.Sequence (Seq)
 import qualified Pipes as P
 import qualified Pipes.Internal as P
 import Prelude hiding (filter, error, log)
+import qualified Streaming.Internal as S
 
 #if MIN_VERSION_transformers(0,5,3)
 import Control.Monad.Trans.Accum (AccumT(AccumT))
@@ -111,7 +115,7 @@ newtype DiT level path msg m a
   = DiT (ReaderT (Di level path msg, H STM m) m a)
   deriving (Functor, Applicative, Alternative, Monad, MonadIO,
             MonadFail, MonadFix, MonadZip, MonadPlus, MonadCont,
-            MonadState s, MonadWriter w, MonadError e)
+            MonadState s, MonadWriter w, MonadError e, MonadUnliftIO)
 
 -- | Build a 'DiT'.
 --
@@ -499,6 +503,14 @@ instance MonadDi level path msg m
 instance MonadDi level path msg m => MonadDi level path msg (P.ListT m) where
   {-# INLINE local #-}
   local f = \(P.Select p) -> P.Select (local f p)
+
+instance (MonadDi level path msg m, Functor f)
+  => MonadDi level path msg (S.Stream f m) where
+  {-# INLINABLE local #-}
+  local g = \case
+     S.Step fs -> S.Step (local g <$> fs)
+     S.Effect ms -> S.Effect (local g <$> ms)
+     S.Return r -> S.Return r
 
 --------------------------------------------------------------------------------
 

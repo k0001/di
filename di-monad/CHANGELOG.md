@@ -1,6 +1,13 @@
+# Version 1.3.2
+
+* Add `MonadUnliftIO` instance for `DiT`.
+
+* Add `MonadDi` instance for `streaming`'s `Stream`.
+
+
 # Version 1.3.1
 
-* Instance `MonadError e m => MonadError e (DiT level path msg m)`
+* Add `MonadError` instance for `DiT`.
 
 # Version 1.3
 

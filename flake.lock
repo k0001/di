@@ -35,6 +35,23 @@
         "type": "github"
       }
     },
+    "hs_streaming": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1688650566,
+        "narHash": "sha256-4IYTasNUgN/W4nbS5eNUo9jllkGuG72t/FttQeVdYCs=",
+        "owner": "haskell-streaming",
+        "repo": "streaming",
+        "rev": "804f2ec54fea144faefa691ea3a622cd0d714d98",
+        "type": "github"
+      },
+      "original": {
+        "owner": "haskell-streaming",
+        "ref": "0.2.4.0",
+        "repo": "streaming",
+        "type": "github"
+      }
+    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1691766535,
@@ -73,6 +90,7 @@
       "inputs": {
         "flake-parts": "flake-parts",
         "hs_bsb-http-chunked": "hs_bsb-http-chunked",
+        "hs_streaming": "hs_streaming",
         "nixpkgs": "nixpkgs"
       }
     }

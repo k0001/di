@@ -10,6 +10,10 @@
         "github:sjakobi/bsb-http-chunked/c0ecd72fe2beb1cf7de9340cc8b4a31045460532";
       flake = false;
     };
+    hs_streaming = {
+      url = "github:haskell-streaming/streaming/0.2.4.0";
+      flake = false;
+    };
   };
 
   outputs = inputs@{ ... }:
@@ -31,6 +35,9 @@
                 di-df1 = hsClean (hself.callPackage ./di-df1 { });
                 di-handle = hsClean (hself.callPackage ./di-handle { });
                 di-monad = hsClean (hself.callPackage ./di-monad { });
+
+                streaming =
+                  hself.callCabal2nix "streaming" inputs.hs_streaming { };
 
                 # hoogle stuff
                 bsb-http-chunked = hself.callCabal2nix "bsb-http-chunked"
