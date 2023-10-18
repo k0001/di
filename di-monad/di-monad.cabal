@@ -14,25 +14,82 @@ description: mtl flavoured typeful hierarchical structured logging for di-core.
 homepage: https://github.com/k0001/di
 bug-reports: https://github.com/k0001/di/issues
 
+flag monad-control
+  description: Library support: monad-control
+  manual: True
+  default: True
+
+flag pipes
+  description: Library support: pipes
+  manual: True
+  default: True
+
+flag pipes-safe
+  description: Library support: pipes-safe
+  manual: True
+  default: True
+
+flag primitive
+  description: Library support: primitive
+  manual: True
+  default: True
+
+flag streaming
+  description: Library support: streaming
+  manual: True
+  default: True
+
+flag transformers-base
+  description: Library support: transformers-base
+  manual: True
+  default: True
+
+flag unliftio-core
+  description: Library support: unliftio-core
+  manual: True
+  default: True
+
 library
   hs-source-dirs: lib
   default-language: Haskell2010
   exposed-modules: Di.Monad
+  ghcjs-options: -Wall -O3
+  ghc-options: -Wall -O2
   build-depends:
     base >=4.9 && <5.0,
     containers,
     di-core,
     exceptions,
-    monad-control,
     mtl,
-    pipes,
-    pipes-safe,
-    primitive,
     stm,
-    streaming,
-    transformers,
-    transformers-base,
-    unliftio-core
-  ghcjs-options: -Wall -O3
-  ghc-options: -Wall -O2
+    transformers
+
+  if flag(monad-control)
+    cpp-options: -DFLAG_monad_control -DFLAG_transformers_base
+    build-depends: monad-control, transformers-base
+
+  if flag(pipes)
+    cpp-options: -DFLAG_pipes
+    build-depends: pipes
+
+  if flag(pipes-safe)
+    cpp-options: -DFLAG_pipes_safe -DFLAG_pipes -DFLAG_monad_control
+                 -DFLAG_transformers_base
+    build-depends: pipes-safe, pipes, monad-control, transformers-base
+
+  if flag(primitive)
+    cpp-options: -DFLAG_primitive
+    build-depends: primitive
+
+  if flag(streaming)
+    cpp-options: -DFLAG_streaming -DFLAG_transformers_base
+    build-depends: streaming, transformers-base
+
+  if flag(transformers-base)
+    cpp-options: -DFLAG_transformers_base
+    build-depends: transformers-base
+
+  if flag(unliftio-core)
+    cpp-options: -DFLAG_unliftio-core
+    build-depends: unliftio-core
 

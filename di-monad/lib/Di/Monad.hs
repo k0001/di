@@ -3,15 +3,16 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# OPTIONS_HADDOCK not-home #-}
 {-# OPTIONS_GHC -Wno-unused-imports #-}
+{-# OPTIONS_HADDOCK not-home #-}
 
 -- | This module offers a monadic alternative to the “bare” logging API offered
 -- by "Di.Core".
@@ -43,65 +44,86 @@
 -- import "Di.Monad" as Di
 -- @
 module Di.Monad
- ( -- * MonadDi
-   MonadDi(ask, local, natSTM)
- , log
- , flush
- , push
- , filter
- , throw
- , onException
+   ( -- * MonadDi
+    MonadDi (ask, local, natSTM)
+   , log
+   , flush
+   , push
+   , filter
+   , throw
+   , onException
 
- , -- * DiT
-   DiT
- , diT
- , runDiT
- , runDiT'
- , hoistDiT
- , localDiT
- ) where
+    -- * DiT
+   , DiT
+   , diT
+   , runDiT
+   , runDiT'
+   , hoistDiT
+   , localDiT
+   ) where
 
 import Control.Applicative (Alternative)
 import Control.Concurrent.STM (STM, atomically)
 import Control.Monad (MonadPlus)
-import qualified Control.Monad.Catch as Ex
-import Control.Monad.Cont (MonadCont, ContT(ContT))
-import Control.Monad.Except (ExceptT(ExceptT), MonadError)
+import Control.Monad.Catch qualified as Ex
+import Control.Monad.Cont (ContT (ContT), MonadCont)
+import Control.Monad.Except (ExceptT (ExceptT), MonadError)
 import Control.Monad.Fail (MonadFail)
 import Control.Monad.Fix (MonadFix)
 import Control.Monad.IO.Class (MonadIO, liftIO)
-import Control.Monad.IO.Unlift (MonadUnliftIO)
-import Control.Monad.Primitive (PrimMonad)
-import Control.Monad.Reader (ReaderT(ReaderT), MonadReader)
-import qualified Control.Monad.Reader as Reader
-import qualified Control.Monad.RWS.Lazy as RWSL
-import qualified Control.Monad.RWS.Strict as RWSS
+import Control.Monad.RWS.Lazy qualified as RWSL
+import Control.Monad.RWS.Strict qualified as RWSS
+import Control.Monad.Reader (MonadReader, ReaderT (ReaderT))
+import Control.Monad.Reader qualified as Reader
 import Control.Monad.State (MonadState)
-import qualified Control.Monad.State.Lazy as SL
-import qualified Control.Monad.State.Strict as SS
+import Control.Monad.State.Lazy qualified as SL
+import Control.Monad.State.Strict qualified as SS
 import Control.Monad.Trans.Class (MonadTrans, lift)
-import Control.Monad.Trans.Identity (IdentityT(IdentityT))
-import Control.Monad.Trans.Maybe (MaybeT(MaybeT))
-import Control.Monad.Base (MonadBase)
-import Control.Monad.Trans.Control (MonadBaseControl)
+import Control.Monad.Trans.Identity (IdentityT (IdentityT))
+import Control.Monad.Trans.Maybe (MaybeT (MaybeT))
 import Control.Monad.Writer (MonadWriter)
-import qualified Control.Monad.Writer.Lazy as WL
-import qualified Control.Monad.Writer.Strict as WS
+import Control.Monad.Writer.Lazy qualified as WL
+import Control.Monad.Writer.Strict qualified as WS
 import Control.Monad.Zip (MonadZip)
 import Data.Sequence (Seq)
-import qualified Pipes as P
-import qualified Pipes.Safe as P
-import qualified Pipes.Internal as P
-import Prelude hiding (filter, error, log)
-import qualified Streaming.Internal as S
+import Prelude hiding (error, filter, log)
 
 #if MIN_VERSION_transformers(0,5,3)
 import Control.Monad.Trans.Accum (AccumT(AccumT))
 import Control.Monad.Trans.Select (SelectT(SelectT))
 #endif
 
+#ifdef FLAG_unliftio_core
+import Control.Monad.IO.Unlift (MonadUnliftIO)
+#endif
+
+#ifdef FLAG_pipes
+import Pipes qualified as P
+import Pipes.Internal qualified as P
+#endif
+
+#ifdef FLAG_pipes_safe
+import Pipes.Safe qualified as P
+#endif
+
+#ifdef FLAG_primitive
+import Control.Monad.Primitive (PrimMonad)
+#endif
+
+#ifdef FLAG_transformers_base
+import Control.Monad.Base (MonadBase)
+#endif
+
+#ifdef FLAG_monad_control
+import Control.Monad.Trans.Control (MonadBaseControl)
+#endif
+
+#ifdef FLAG_streaming
+import Streaming.Internal qualified as S
+#endif
+
 import Di.Core (Di)
-import qualified Di.Core as Di
+import Di.Core qualified as Di
 
 --------------------------------------------------------------------------------
 
@@ -116,11 +138,43 @@ newtype H f g = H (forall x. f x -> g x)
 --
 -- The most primitive way to run a 'DiT' is through 'runDiT''.
 newtype DiT level path msg m a
-  = DiT (ReaderT (Di level path msg, H STM m) m a)
-  deriving (Functor, Applicative, Alternative, Monad, MonadIO,
-            MonadFail, MonadFix, MonadZip, MonadPlus, MonadCont,
-            MonadState s, MonadWriter w, MonadError e, MonadUnliftIO,
-            P.MonadSafe, PrimMonad, MonadBase b, MonadBaseControl b)
+   = DiT (ReaderT (Di level path msg, H STM m) m a)
+   deriving
+      ( Functor
+      , Applicative
+      , Alternative
+      , Monad
+      , MonadIO
+      , MonadFail
+      , MonadFix
+      , MonadZip
+      , MonadPlus
+      , MonadCont
+      , MonadState s
+      , MonadWriter w
+      , MonadError e
+
+#ifdef FLAG_unliftio_core
+      , MonadUnliftIO
+#endif
+
+#ifdef FLAG_pipes_safe
+      , P.MonadSafe
+#endif
+
+#ifdef FLAG_primitive
+      , PrimMonad
+#endif
+
+#ifdef FLAG_transformers_base
+      , MonadBase b
+#endif
+
+#ifdef FLAG_monad_control
+      , MonadBaseControl b
+#endif
+
+      )
 
 -- | Build a 'DiT'.
 --
@@ -130,14 +184,14 @@ newtype DiT level path msg m a
 --        == 'pure' (nat, di)
 -- @
 diT
-  :: ((forall x. STM x -> m x) -> Di level path msg -> m a)
-  -> DiT level path msg m a
+   :: ((forall x. STM x -> m x) -> Di level path msg -> m a)
+   -> DiT level path msg m a
 diT f = DiT (ReaderT (\(di, H nat) -> f nat di))
 {-# INLINE diT #-}
 
 instance MonadTrans (DiT level path msg) where
-  lift = \x -> DiT (lift x)
-  {-# INLINE lift #-}
+   lift = \x -> DiT (lift x)
+   {-# INLINE lift #-}
 
 -- | Run a 'DiT'.
 --
@@ -159,10 +213,10 @@ instance MonadTrans (DiT level path msg) where
 --
 -- Also, notice that 'runDiT' is a /monad morphism/ from @'DiT' m@ to @m@.
 runDiT
-  :: MonadIO m
-  => Di level path msg
-  -> DiT level path msg m a
-  -> m a  -- ^
+   :: (MonadIO m)
+   => Di level path msg
+   -> DiT level path msg m a
+   -> m a
 runDiT = runDiT' (\x -> liftIO (atomically x))
 {-# INLINE runDiT #-}
 
@@ -239,10 +293,10 @@ runDiT = runDiT' (\x -> liftIO (atomically x))
 -- before returning. You are responsible for doing that (or, more likely,
 -- 'Di.Core.new' will do it for you).
 runDiT'
-  :: (forall x. STM x -> m x)
-  -> Di level path msg
-  -> DiT level path msg m a
-  -> m a  -- ^
+   :: (forall x. STM x -> m x)
+   -> Di level path msg
+   -> DiT level path msg m a
+   -> m a
 runDiT' h = \di -> \(DiT (ReaderT f)) -> f (di, H h)
 {-# INLINE runDiT' #-}
 
@@ -263,13 +317,16 @@ runDiT' h = \di -> \(DiT (ReaderT f)) -> f (di, H h)
 -- In practical terms, it means that most times you can “hoist” a 'DiT'
 -- anyway, just not through 'Control.Monad.Morph.hoist'.
 hoistDiT
-  :: (forall x. n x -> m x) -- ^ Natural transformation from @n@ to @m@.
-  -> (forall x. m x -> n x) -- ^ Monad morphism from @m@ to @n@.
-  -> (DiT level path msg m a -> DiT level path msg n a)
-  -- ^ Monad morphism from @'DiT' m@ to @'DiT' n@.
+   :: (forall x. n x -> m x)
+   -- ^ Natural transformation from @n@ to @m@.
+   -> (forall x. m x -> n x)
+   -- ^ Monad morphism from @m@ to @n@.
+   -> (DiT level path msg m a -> DiT level path msg n a)
+   -- ^ Monad morphism from @'DiT' m@ to @'DiT' n@.
 {-# INLINE hoistDiT #-}
 hoistDiT hgf hfg = \(DiT (ReaderT f)) ->
-  DiT (ReaderT (\(di, H hstmg) -> hfg (f (di, H (\stm -> hgf (hstmg stm))))))
+   DiT (ReaderT (\(di, H hstmg) ->
+      hfg (f (di, H (\stm -> hgf (hstmg stm))))))
 
 -- | Run a 'DiT' with a modified 'Di':
 --
@@ -318,48 +375,50 @@ hoistDiT hgf hfg = \(DiT (ReaderT f)) ->
 -- 'localDiT' f ('pure' ()) '>>' x  ==  x
 -- @
 localDiT
-  :: (Di level path msg -> Di level' path' msg')
-  -> DiT level' path' msg' m a
-  -> DiT level path msg m a -- ^
-localDiT f = \(DiT (ReaderT gma)) -> DiT (ReaderT (\(di, h) -> gma (f di, h)))
+   :: (Di level path msg -> Di level' path' msg')
+   -> DiT level' path' msg' m a
+   -> DiT level path msg m a
+localDiT f = \(DiT (ReaderT gma)) ->
+   DiT (ReaderT (\(di, h) -> gma (f di, h)))
 {-# INLINE localDiT #-}
 
-instance MonadReader r m => MonadReader r (DiT level path msg m) where
-  ask = DiT (ReaderT (\_ -> Reader.ask))
-  {-# INLINE ask #-}
-  local f = \(DiT (ReaderT gma)) ->
-    DiT (ReaderT (\di -> Reader.local f (gma di)))
-  {-# INLINE local #-}
+instance (MonadReader r m) => MonadReader r (DiT level path msg m) where
+   ask = DiT (ReaderT (\_ -> Reader.ask))
+   {-# INLINE ask #-}
+   local f = \(DiT (ReaderT gma)) ->
+      DiT (ReaderT (\di -> Reader.local f (gma di)))
+   {-# INLINE local #-}
 
 -- | Throw an 'Ex.Exception' from the underlying @m@, without logging it.
 --
 -- If you want to log the 'Ex.Exception' as you throw it, use 'throw' instead.
-instance Ex.MonadThrow m => Ex.MonadThrow (DiT level path msg m) where
-  throwM e = DiT (ReaderT (\_ -> Ex.throwM e))
-  {-# INLINE throwM #-}
+instance (Ex.MonadThrow m) => Ex.MonadThrow (DiT level path msg m) where
+   throwM e = DiT (ReaderT (\_ -> Ex.throwM e))
+   {-# INLINE throwM #-}
 
-instance Ex.MonadCatch m => Ex.MonadCatch (DiT level path msg m) where
-  catch (DiT (ReaderT f)) = \g -> DiT (ReaderT (\x ->
-    Ex.catch (f x) (\e -> let DiT (ReaderT h) = g e in h x)))
-  {-# INLINE catch #-}
+instance (Ex.MonadCatch m) => Ex.MonadCatch (DiT level path msg m) where
+   catch (DiT (ReaderT f)) = \g ->
+      DiT $ ReaderT $ \x ->
+         Ex.catch (f x) (\e -> let DiT (ReaderT h) = g e in h x)
+   {-# INLINE catch #-}
 
-instance Ex.MonadMask m => Ex.MonadMask (DiT level path msg m) where
-  mask f = DiT (ReaderT (\x ->
-    Ex.mask (\u ->
-      case f (\(DiT (ReaderT g)) -> DiT (ReaderT (u . g))) of
-         DiT (ReaderT h) -> h x)))
-  {-# INLINE mask #-}
-  uninterruptibleMask f = DiT (ReaderT (\x ->
-    Ex.uninterruptibleMask (\u ->
-      case f (\(DiT (ReaderT g)) -> DiT (ReaderT (u . g))) of
-        DiT (ReaderT h) -> h x)))
-  {-# INLINE uninterruptibleMask #-}
-  generalBracket acq rel use = DiT (ReaderT (\x ->
-    Ex.generalBracket
-      (case acq of DiT (ReaderT m) -> m x)
-      (\res ec -> case rel res ec of DiT (ReaderT m) -> m x)
-      (\res -> case use res of DiT (ReaderT m) -> m x)))
-  {-# INLINABLE generalBracket #-}
+instance (Ex.MonadMask m) => Ex.MonadMask (DiT level path msg m) where
+   mask f =
+      DiT $ ReaderT $ \x -> Ex.mask $ \u ->
+         case f (\(DiT (ReaderT g)) -> DiT (ReaderT (u . g))) of
+            DiT (ReaderT h) -> h x
+   {-# INLINE mask #-}
+   uninterruptibleMask f =
+      DiT $ ReaderT $ \x -> Ex.uninterruptibleMask $ \u ->
+         case f (\(DiT (ReaderT g)) -> DiT (ReaderT (u . g))) of
+            DiT (ReaderT h) -> h x
+   {-# INLINE uninterruptibleMask #-}
+   generalBracket acq rel use =
+      DiT $ ReaderT $ \x -> Ex.generalBracket
+         (case acq of DiT (ReaderT m) -> m x)
+         (\res ec -> case rel res ec of DiT (ReaderT m) -> m x)
+         (\res -> case use res of DiT (ReaderT m) -> m x)
+   {-# INLINEABLE generalBracket #-}
 
 --------------------------------------------------------------------------------
 
@@ -375,115 +434,134 @@ instance Ex.MonadMask m => Ex.MonadMask (DiT level path msg m) where
 --
 -- Semantically, @'MonadDi' m@ is a “reader monad” that carries as its
 -- environment a 'Di' and natural transformation from 'STM' to @m@.
-class Monad m => MonadDi level path msg m | m -> level path msg where
-  -- | Get the 'Di' inside @m@, unmodified.
-  --
-  -- Idempotence law:
-  --
-  -- @
-  -- 'ask' '>>' 'ask'  ==  'ask'
-  -- @
-  ask :: m (Di level path msg)
-  default ask
-    :: (MonadTrans t, MonadDi level path msg n, m ~ t n)
-    => m (Di level path msg)
-  ask = lift ask
-  {-# INLINE ask #-}
+class (Monad m) => MonadDi level path msg m | m -> level path msg where
+   -- | Get the 'Di' inside @m@, unmodified.
+   --
+   -- Idempotence law:
+   --
+   -- @
+   -- 'ask' '>>' 'ask'  ==  'ask'
+   -- @
+   ask :: m (Di level path msg)
+   default ask
+      :: (MonadTrans t, MonadDi level path msg n, m ~ t n)
+      => m (Di level path msg)
+   ask = lift ask
+   {-# INLINE ask #-}
 
-  -- | Run @m a@ with a modified 'Di':
-  --
-  -- @
-  -- 'local' ('const' x) 'ask'  ==  'pure' x
-  -- @
-  --
-  -- Identity law:
-  --
-  -- @
-  -- 'local' 'id' x  ==  x
-  -- @
-  --
-  -- Distributive law:
-  --
-  -- @
-  -- 'local' f '.' 'local' g  ==  'local' (f '.' g)
-  -- @
-  --
-  -- Idempotence law:
-  --
-  -- @
-  -- 'local' f ('pure' ()) '>>' x  ==  x
-  -- @
-  local :: (Di level path msg -> Di level path msg) -> m a -> m a
+   -- | Run @m a@ with a modified 'Di':
+   --
+   -- @
+   -- 'local' ('const' x) 'ask'  ==  'pure' x
+   -- @
+   --
+   -- Identity law:
+   --
+   -- @
+   -- 'local' 'id' x  ==  x
+   -- @
+   --
+   -- Distributive law:
+   --
+   -- @
+   -- 'local' f '.' 'local' g  ==  'local' (f '.' g)
+   -- @
+   --
+   -- Idempotence law:
+   --
+   -- @
+   -- 'local' f ('pure' ()) '>>' x  ==  x
+   -- @
+   local :: (Di level path msg -> Di level path msg) -> m a -> m a
 
-  -- | Natural transformation from 'STM' to @m@.
-  --
-  -- Notice that /it is not necessary/ for this natural transformation to be a
-  -- monad morphism as well. That is, 'atomically' is acceptable.
-  natSTM :: STM a -> m a
-  default natSTM
-    :: (MonadTrans t, MonadDi level path msg n, m ~ t n)
-    => STM a -> m a
-  natSTM = \x -> lift (natSTM x)
-  {-# INLINE natSTM #-}
+   -- | Natural transformation from 'STM' to @m@.
+   --
+   -- Notice that /it is not necessary/ for this natural transformation to be a
+   -- monad morphism as well. That is, 'atomically' is acceptable.
+   natSTM :: STM a -> m a
+   default natSTM
+      :: (MonadTrans t, MonadDi level path msg n, m ~ t n)
+      => STM a
+      -> m a
+   natSTM = \x -> lift (natSTM x)
+   {-# INLINE natSTM #-}
 
-instance Monad m => MonadDi level path msg (DiT level path msg m) where
-  ask = DiT (ReaderT (\(di,_) -> pure di))
-  {-# INLINE ask #-}
-  natSTM = \x -> DiT (ReaderT (\(_, H h) -> h x))
-  {-# INLINE natSTM #-}
-  local f = localDiT f
-  {-# INLINE local #-}
+instance (Monad m) => MonadDi level path msg (DiT level path msg m) where
+   ask = DiT (ReaderT (\(di, _) -> pure di))
+   {-# INLINE ask #-}
+   natSTM = \x -> DiT (ReaderT (\(_, H h) -> h x))
+   {-# INLINE natSTM #-}
+   local f = localDiT f
+   {-# INLINE local #-}
 
-instance MonadDi level path msg m
-  => MonadDi level path msg (ReaderT r m) where
-  local f = \(ReaderT gma) -> ReaderT (\r -> local f (gma r))
-  {-# INLINE local #-}
+instance
+   (MonadDi level path msg m)
+   => MonadDi level path msg (ReaderT r m)
+   where
+   local f = \(ReaderT gma) -> ReaderT (\r -> local f (gma r))
+   {-# INLINE local #-}
 
-instance MonadDi level path msg m
-  => MonadDi level path msg (SS.StateT s m) where
-  local f = \(SS.StateT gma) -> SS.StateT (\s -> local f (gma s))
-  {-# INLINE local #-}
+instance
+   (MonadDi level path msg m)
+   => MonadDi level path msg (SS.StateT s m)
+   where
+   local f = \(SS.StateT gma) -> SS.StateT (\s -> local f (gma s))
+   {-# INLINE local #-}
 
-instance MonadDi level path msg m
-  => MonadDi level path msg (SL.StateT s m) where
-  local f = \(SL.StateT gma) -> SL.StateT (\s -> local f (gma s))
-  {-# INLINE local #-}
+instance
+   (MonadDi level path msg m)
+   => MonadDi level path msg (SL.StateT s m)
+   where
+   local f = \(SL.StateT gma) -> SL.StateT (\s -> local f (gma s))
+   {-# INLINE local #-}
 
-instance (Monoid w, MonadDi level path msg m)
-  => MonadDi level path msg (WS.WriterT w m) where
-  local f = \(WS.WriterT ma) -> WS.WriterT (local f ma)
-  {-# INLINE local #-}
+instance
+   (Monoid w, MonadDi level path msg m)
+   => MonadDi level path msg (WS.WriterT w m)
+   where
+   local f = \(WS.WriterT ma) -> WS.WriterT (local f ma)
+   {-# INLINE local #-}
 
-instance (Monoid w, MonadDi level path msg m)
-  => MonadDi level path msg (WL.WriterT w m) where
-  local f = \(WL.WriterT ma) -> WL.WriterT (local f ma)
-  {-# INLINE local #-}
+instance
+   (Monoid w, MonadDi level path msg m)
+   => MonadDi level path msg (WL.WriterT w m)
+   where
+   local f = \(WL.WriterT ma) -> WL.WriterT (local f ma)
+   {-# INLINE local #-}
 
-instance MonadDi level path msg m => MonadDi level path msg (MaybeT m) where
-  local f = \(MaybeT ma) -> MaybeT (local f ma)
-  {-# INLINE local #-}
+instance (MonadDi level path msg m)
+   => MonadDi level path msg (MaybeT m) where
+   local f = \(MaybeT ma) -> MaybeT (local f ma)
+   {-# INLINE local #-}
 
-instance MonadDi level path msg m => MonadDi level path msg (ExceptT e m) where
-  local f = \(ExceptT ma) -> ExceptT (local f ma)
-  {-# INLINE local #-}
+instance (MonadDi level path msg m)
+   => MonadDi level path msg (ExceptT e m) where
+   local f = \(ExceptT ma) -> ExceptT (local f ma)
+   {-# INLINE local #-}
 
-instance MonadDi level path msg m => MonadDi level path msg (IdentityT m) where
-  local f = \(IdentityT ma) -> IdentityT (local f ma)
-  {-# INLINE local #-}
+instance (MonadDi level path msg m)
+   => MonadDi level path msg (IdentityT m) where
+   local f = \(IdentityT ma) -> IdentityT (local f ma)
+   {-# INLINE local #-}
 
-instance MonadDi level path msg m => MonadDi level path msg (ContT r m) where
-  local f = \(ContT gma) -> ContT (\r -> local f (gma r))
-  {-# INLINE local #-}
+instance (MonadDi level path msg m)
+   => MonadDi level path msg (ContT r m) where
+   local f = \(ContT gma) -> ContT (\r -> local f (gma r))
+   {-# INLINE local #-}
 
-instance (Monoid w, MonadDi level path msg m)
-  => MonadDi level path msg (RWSS.RWST r w s m) where
-  local f = \(RWSS.RWST gma) -> RWSS.RWST (\r s -> local f (gma r s))
-  {-# INLINE local #-}
+instance
+   (Monoid w, MonadDi level path msg m)
+   => MonadDi level path msg (RWSS.RWST r w s m)
+   where
+   local f = \(RWSS.RWST gma) -> RWSS.RWST (\r s -> local f (gma r s))
+   {-# INLINE local #-}
 
-instance (Monoid w, MonadDi level path msg m)
-  => MonadDi level path msg (RWSL.RWST r w s m) where
-  local f = \(RWSL.RWST gma) -> RWSL.RWST (\r s -> local f (gma r s))
-  {-# INLINE local #-}
+instance
+   (Monoid w, MonadDi level path msg m)
+   => MonadDi level path msg (RWSL.RWST r w s m)
+   where
+   local f = \(RWSL.RWST gma) -> RWSL.RWST (\r s -> local f (gma r s))
+   {-# INLINE local #-}
 
 #if MIN_VERSION_transformers(0,5,3)
 instance (Monoid w, MonadDi level path msg m)
@@ -496,26 +574,43 @@ instance MonadDi level path msg m => MonadDi level path msg (SelectT r m) where
   {-# INLINE local #-}
 #endif
 
-instance MonadDi level path msg m
-  => MonadDi level path msg (P.Proxy a' a b' b m) where
-  {-# INLINABLE local #-}
-  local f = \case
-     P.Request a' fa -> P.Request a'(\a -> local f (fa  a ))
-     P.Respond b fb' -> P.Respond b (\b' -> local f (fb' b'))
-     P.Pure r -> P.Pure r
-     P.M m -> P.M (local f m >>= \r -> pure (local f r))
+#ifdef FLAG_pipes
+instance
+   (MonadDi level path msg m)
+   => MonadDi level path msg (P.Proxy a' a b' b m)
+   where
+   {-# INLINEABLE local #-}
+   local f = \case
+      P.Request a' fa -> P.Request a' (\a -> local f (fa a))
+      P.Respond b fb' -> P.Respond b (\b' -> local f (fb' b'))
+      P.Pure r -> P.Pure r
+      P.M m -> P.M (local f m >>= \r -> pure (local f r))
 
-instance MonadDi level path msg m => MonadDi level path msg (P.ListT m) where
-  {-# INLINE local #-}
-  local f = \(P.Select p) -> P.Select (local f p)
+instance (MonadDi level path msg m) => MonadDi level path msg (P.ListT m) where
+   {-# INLINE local #-}
+   local f = \(P.Select p) -> P.Select (local f p)
+#endif
 
-instance (MonadDi level path msg m, Functor f)
-  => MonadDi level path msg (S.Stream f m) where
-  {-# INLINABLE local #-}
-  local g = \case
-     S.Step fs -> S.Step (local g <$> fs)
-     S.Effect ms -> S.Effect (local g <$> ms)
-     S.Return r -> S.Return r
+#ifdef FLAG_pipes_safe
+{- TODO: Needs the following upstream patch:
+           https://github.com/Gabriella439/Haskell-Pipes-Safe-Library/pull/62
+instance (MonadDi level path msg m) => MonadDi level path msg (P.SafeT m) where
+   {-# INLINE local #-}
+   local f = \(P.SafeT g) -> P.SafeT (local f g)
+-}
+#endif
+
+#ifdef FLAG_streaming
+instance
+   (MonadDi level path msg m, Functor f)
+   => MonadDi level path msg (S.Stream f m)
+   where
+   {-# INLINEABLE local #-}
+   local g = \case
+      S.Step fs -> S.Step (local g <$> fs)
+      S.Effect ms -> S.Effect (local g <$> ms)
+      S.Return r -> S.Return r
+#endif
 
 --------------------------------------------------------------------------------
 
@@ -539,7 +634,7 @@ instance (MonadDi level path msg m, Functor f)
 -- that happens, that same exception will have already already been thrown
 -- asynchronously to this same thread anyway, so unless you did something funny
 -- to recover from that exception, you will have died already.
-log :: MonadDi level path msg m => level -> msg -> m ()
+log :: (MonadDi level path msg m) => level -> msg -> m ()
 log l = \m -> ask >>= \di -> Di.log' natSTM di l m
 {-# INLINE log #-}
 
@@ -554,9 +649,9 @@ log l = \m -> ask >>= \di -> Di.log' natSTM di l m
 --
 -- Please see 'log' to understand how exceptions behave in this function (hint:
 -- they behave unsurprisingly).
-flush :: MonadDi level path msg m => m ()
+flush :: (MonadDi level path msg m) => m ()
 flush = Di.flush' natSTM =<< ask
-{-# INLINABLE flush #-}
+{-# INLINEABLE flush #-}
 
 -- | Require that any logged messages within the given action satisfy the given
 -- predicate in order to be accepted for processing. Logged messages that
@@ -580,23 +675,23 @@ flush = Di.flush' natSTM =<< ask
 -- 'filter' f . 'filter' g  ==  'filter' g . 'filter' f
 -- @
 filter
-  :: MonadDi level path msg m
-  => (level -> Seq path -> msg -> Bool)
-  -- ^ Whether a particular log entry with the given @level@, @path@s and
-  -- @msg@ should be logged.
-  --
-  -- The given @path@s indicate where the 'log' call was made from, with an
-  -- empty 'Seq' representing 'log' calls made at the current depth level
-  -- (see 'push'). The leftmost @path@ in the 'Seq.Seq' is the most immediate
-  -- child, while the rightmost is the most distand child (i.e., the @path@
-  -- closest to the place where 'log' call actually took place).
-  -> m a
-  -> m a
+   :: (MonadDi level path msg m)
+   => (level -> Seq path -> msg -> Bool)
+   -- ^ Whether a particular log entry with the given @level@, @path@s and
+   -- @msg@ should be logged.
+   --
+   -- The given @path@s indicate where the 'log' call was made from, with an
+   -- empty 'Seq' representing 'log' calls made at the current depth level
+   -- (see 'push'). The leftmost @path@ in the 'Seq.Seq' is the most immediate
+   -- child, while the rightmost is the most distand child (i.e., the @path@
+   -- closest to the place where 'log' call actually took place).
+   -> m a
+   -> m a
 filter f = local (Di.filter f)
 {-# INLINE filter #-}
 
 -- | Run the given action under a deeper @path@.
-push :: MonadDi level path msg m => path -> m a -> m a
+push :: (MonadDi level path msg m) => path -> m a -> m a
 push p = local (Di.push p)
 {-# INLINE push #-}
 
@@ -621,10 +716,10 @@ push p = local (Di.push p)
 -- rejected by a previous use of 'onException', but it can reject a previously
 -- accepted one.
 onException
-  :: MonadDi level path msg m
-  => (Ex.SomeException -> Maybe (level, Seq path, msg))
-  -> m a
-  -> m a
+   :: (MonadDi level path msg m)
+   => (Ex.SomeException -> Maybe (level, Seq path, msg))
+   -> m a
+   -> m a
 onException f = local (Di.onException f)
 
 -- | Throw an 'Ex.Exception', but not without logging it first according to the
@@ -641,4 +736,3 @@ onException f = local (Di.onException f)
 throw :: (MonadDi level path msg m, Ex.Exception e) => e -> m a
 throw e = ask >>= \di -> Di.throw' natSTM di e
 {-# INLINE throw #-}
-

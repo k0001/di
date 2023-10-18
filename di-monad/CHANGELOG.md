@@ -3,6 +3,10 @@
 * Add `MonadBase`, `MonadBaseControl`, `PrimMonad` and `MonadSafe` instances
   for `DiT`.
 
+* Add Cabal flags for optional third-party libraries support: `monad-control`,
+  `pipes`, `pipes-safe`, `primitive`, `streaming`, `transformers-base`,
+  `unliftio-core`.
+
 
 # Version 1.3.2
 
