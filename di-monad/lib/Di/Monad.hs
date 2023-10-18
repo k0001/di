@@ -82,6 +82,8 @@ import qualified Control.Monad.State.Strict as SS
 import Control.Monad.Trans.Class (MonadTrans, lift)
 import Control.Monad.Trans.Identity (IdentityT(IdentityT))
 import Control.Monad.Trans.Maybe (MaybeT(MaybeT))
+import Control.Monad.Base (MonadBase)
+import Control.Monad.Trans.Control (MonadBaseControl)
 import Control.Monad.Writer (MonadWriter)
 import qualified Control.Monad.Writer.Lazy as WL
 import qualified Control.Monad.Writer.Strict as WS
@@ -118,7 +120,7 @@ newtype DiT level path msg m a
   deriving (Functor, Applicative, Alternative, Monad, MonadIO,
             MonadFail, MonadFix, MonadZip, MonadPlus, MonadCont,
             MonadState s, MonadWriter w, MonadError e, MonadUnliftIO,
-            P.MonadSafe, PrimMonad)
+            P.MonadSafe, PrimMonad, MonadBase b, MonadBaseControl b)
 
 -- | Build a 'DiT'.
 --

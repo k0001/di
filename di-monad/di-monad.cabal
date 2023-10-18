@@ -23,6 +23,7 @@ library
     containers,
     di-core,
     exceptions,
+    monad-control,
     mtl,
     pipes,
     pipes-safe,
@@ -30,6 +31,7 @@ library
     stm,
     streaming,
     transformers,
+    transformers-base,
     unliftio-core
   ghcjs-options: -Wall -O3
   ghc-options: -Wall -O2
