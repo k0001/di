@@ -1,6 +1,6 @@
 # Version 1.3.3
 
-* Add `MonadSafe` instance for `DiT`.
+* Add `MonadSafe` and `PrimMonad` instances for `DiT`.
 
 
 # Version 1.3.2

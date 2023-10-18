@@ -26,6 +26,7 @@ library
     mtl,
     pipes,
     pipes-safe,
+    primitive,
     stm,
     streaming,
     transformers,

@@ -63,6 +63,7 @@ module Di.Monad
 
 import Control.Applicative (Alternative)
 import Control.Concurrent.STM (STM, atomically)
+import Control.Monad (MonadPlus)
 import qualified Control.Monad.Catch as Ex
 import Control.Monad.Cont (MonadCont, ContT(ContT))
 import Control.Monad.Except (ExceptT(ExceptT), MonadError)
@@ -70,7 +71,7 @@ import Control.Monad.Fail (MonadFail)
 import Control.Monad.Fix (MonadFix)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.IO.Unlift (MonadUnliftIO)
-import Control.Monad (MonadPlus)
+import Control.Monad.Primitive (PrimMonad)
 import Control.Monad.Reader (ReaderT(ReaderT), MonadReader)
 import qualified Control.Monad.Reader as Reader
 import qualified Control.Monad.RWS.Lazy as RWSL
@@ -117,7 +118,7 @@ newtype DiT level path msg m a
   deriving (Functor, Applicative, Alternative, Monad, MonadIO,
             MonadFail, MonadFix, MonadZip, MonadPlus, MonadCont,
             MonadState s, MonadWriter w, MonadError e, MonadUnliftIO,
-            P.MonadSafe)
+            P.MonadSafe, PrimMonad)
 
 -- | Build a 'DiT'.
 --
