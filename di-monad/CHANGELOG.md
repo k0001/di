@@ -1,3 +1,8 @@
+# Version 1.3.4
+
+* Fix typo in `unliftio-core` Cabal flag.
+
+
 # Version 1.3.3
 
 * Add `MonadBase`, `MonadBaseControl`, `PrimMonad` and `MonadSafe` instances
