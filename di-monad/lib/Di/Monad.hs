@@ -87,6 +87,7 @@ import qualified Control.Monad.Writer.Strict as WS
 import Control.Monad.Zip (MonadZip)
 import Data.Sequence (Seq)
 import qualified Pipes as P
+import qualified Pipes.Safe as P
 import qualified Pipes.Internal as P
 import Prelude hiding (filter, error, log)
 import qualified Streaming.Internal as S
@@ -115,7 +116,8 @@ newtype DiT level path msg m a
   = DiT (ReaderT (Di level path msg, H STM m) m a)
   deriving (Functor, Applicative, Alternative, Monad, MonadIO,
             MonadFail, MonadFix, MonadZip, MonadPlus, MonadCont,
-            MonadState s, MonadWriter w, MonadError e, MonadUnliftIO)
+            MonadState s, MonadWriter w, MonadError e, MonadUnliftIO,
+            P.MonadSafe)
 
 -- | Build a 'DiT'.
 --
