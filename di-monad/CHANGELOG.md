@@ -1,3 +1,8 @@
+# Version 1.3.6
+
+* Add optional support for `CatchT`.
+
+
 # Version 1.3.5
 
 * Add optional support for `conduit` and `resourcet`.

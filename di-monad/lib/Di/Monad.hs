@@ -66,6 +66,7 @@ import Control.Applicative (Alternative)
 import Control.Concurrent.STM (STM, atomically)
 import Control.Monad (MonadPlus)
 import Control.Monad.Catch qualified as Ex
+import Control.Monad.Catch.Pure qualified as Ex
 import Control.Monad.Cont (ContT (ContT), MonadCont)
 import Control.Monad.Except (ExceptT (ExceptT), MonadError)
 import Control.Monad.Fail (MonadFail)
@@ -581,6 +582,10 @@ instance MonadDi level path msg m => MonadDi level path msg (SelectT r m) where
   local f = \(SelectT gma) -> SelectT (\r -> local f (gma r))
   {-# INLINE local #-}
 #endif
+
+instance MonadDi level path msg m => MonadDi level path msg (Ex.CatchT m) where
+  local f = \(Ex.CatchT m) -> Ex.CatchT (local f m)
+  {-# INLINE local #-}
 
 #ifdef FLAG_pipes
 instance
