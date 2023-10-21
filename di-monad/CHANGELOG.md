@@ -1,3 +1,8 @@
+# Version 1.3.5
+
+* Add optional support for `conduit` and `resourcet`.
+
+
 # Version 1.3.4
 
 * Fix typo in `unliftio-core` Cabal flag.

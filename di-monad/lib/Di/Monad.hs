@@ -122,6 +122,14 @@ import Control.Monad.Trans.Control (MonadBaseControl)
 import Streaming.Internal qualified as S
 #endif
 
+#ifdef FLAG_resourcet
+import Control.Monad.Trans.Resource.Internal qualified as R
+#endif
+
+#ifdef FLAG_conduit
+import Data.Conduit.Internal qualified as C
+#endif
+
 import Di.Core (Di)
 import Di.Core qualified as Di
 
@@ -610,6 +618,40 @@ instance
       S.Step fs -> S.Step (local g <$> fs)
       S.Effect ms -> S.Effect (local g <$> ms)
       S.Return r -> S.Return r
+#endif
+
+#ifdef FLAG_resourcet
+instance R.MonadResource m => R.MonadResource (DiT level path msg m) where
+   {-# INLINE liftResourceT #-}
+   liftResourceT = lift . R.liftResourceT
+
+instance
+   (MonadDi level path msg m)
+   => MonadDi level path msg (R.ResourceT m)
+   where
+   {-# INLINE local #-}
+   local f = \(R.ResourceT g) -> R.ResourceT (local f . g)
+#endif
+
+#ifdef FLAG_conduit
+instance
+   (MonadDi level path msg m)
+   => MonadDi level path msg (C.Pipe l i o u m)
+   where
+   {-# INLINEABLE local #-}
+   local f = \case
+     C.HaveOutput p o -> C.HaveOutput (local f p) o
+     C.NeedInput p c -> C.NeedInput (local f . p) (local f . c)
+     C.Done x -> C.Done x
+     C.PipeM mp -> C.PipeM (local f <$> local f mp)
+     C.Leftover p i -> C.Leftover (local f p) i
+
+instance
+   (MonadDi level path msg m)
+   => MonadDi level path msg (C.ConduitT i o m)
+   where
+   {-# INLINE local #-}
+   local f = \(C.ConduitT k) -> C.ConduitT (local f . k)
 #endif
 
 --------------------------------------------------------------------------------
