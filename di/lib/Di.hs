@@ -94,6 +94,7 @@ module Di
    , Di.Monad.run
    , Di.Monad.local
    , Di.Monad.localT
+   , Di.Monad.dilift
    , Di.Monad.onException
    , Di.Monad.flush
    , Di.Monad.log

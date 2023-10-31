@@ -29,7 +29,7 @@
 
 * Removed `Seq path` from `onException`.
 
-* Introduced `localT`.
+* Introduced `localT`, `dilift`.
 
 
 # Version 1.3.6

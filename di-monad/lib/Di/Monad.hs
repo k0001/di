@@ -63,6 +63,7 @@ module Di.Monad
    , onException
    , local
    , localT
+   , dilift
 
     -- * DiT
    , DiT (..)
@@ -420,6 +421,18 @@ diatomically = \t -> do
    {-# INLINE wrapSTM #-}
    wrapSTM :: forall level' path' msg' b. Di level' path' msg' -> STM b -> STM b
    wrapSTM d mb = Ex.catch mb $ Di.throw' @Ex.SomeException id d
+
+-- | @'dilift' ma@ will run @ma@ with the current logging environment of 't'.
+--
+-- @
+-- 'dilift' ma    ==   'ask' >>= \d -> 'lift' ('local' ('const' d) ma)
+-- @
+dilift
+   :: (MonadDi level path msg m, MonadDi level path msg (t m), MonadTrans t)
+   => m a
+   -> t m a
+dilift = \ma -> ask >>= \d -> lift (local (const d) ma)
+{-# INLINE dilift #-}
 
 -- | Log a message @msg@ with the given importance @level@.
 --
