@@ -1,4 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+
 -- | This module is a highly opinionated, basic, and yet sufficient
 -- choice of a concrete stack of logging solutions belonging to the [di
 -- logging ecosystem](https://github.com/k0001/di)—an otherwise rather
@@ -62,61 +64,65 @@
 -- import qualified "Di"
 -- @
 module Di
- ( new
+   ( new
 
-   -- * Hierarchy
- , Di.Df1.Monad.push
-   -- * Metadata
- , Di.Df1.Monad.attr
- , Di.Df1.Monad.attr_
-   -- * Logging
- , Di.Df1.Monad.debug
- , Di.Df1.Monad.info
- , Di.Df1.Monad.notice
- , Di.Df1.Monad.warning
- , Di.Df1.Monad.error
- , Di.Df1.Monad.alert
- , Di.Df1.Monad.critical
- , Di.Df1.Monad.emergency
-   -- ** Better type-inference
- , Di.Df1.Monad.debug_
- , Di.Df1.Monad.info_
- , Di.Df1.Monad.notice_
- , Di.Df1.Monad.warning_
- , Di.Df1.Monad.error_
- , Di.Df1.Monad.alert_
- , Di.Df1.Monad.critical_
- , Di.Df1.Monad.emergency_
+    -- * Hierarchy
+   , Di.Df1.Monad.push
 
-   -- * Exceptions
- , Di.Monad.throw
+    -- * Metadata
+   , Di.Df1.Monad.attr
+   , Di.Df1.Monad.attr_
 
-   -- * Support for @MonadDi@ and @DiT@
- , Di.Monad.runDiT
- , Di.Monad.hoistDiT
- , Di.Monad.MonadDi(..)
+    -- * Logging
+   , Di.Df1.Monad.debug
+   , Di.Df1.Monad.info
+   , Di.Df1.Monad.notice
+   , Di.Df1.Monad.warning
+   , Di.Df1.Monad.error
+   , Di.Df1.Monad.alert
+   , Di.Df1.Monad.critical
+   , Di.Df1.Monad.emergency
 
-   -- * Convenient type-synonyms
- , Di.Df1.Df1
- , Di.Df1.Monad.Df1T
- , Di.Df1.Monad.MonadDf1
+    -- ** Better type-inference
+   , Di.Df1.Monad.debug_
+   , Di.Df1.Monad.info_
+   , Di.Df1.Monad.notice_
+   , Di.Df1.Monad.warning_
+   , Di.Df1.Monad.error_
+   , Di.Df1.Monad.alert_
+   , Di.Df1.Monad.critical_
+   , Di.Df1.Monad.emergency_
 
-   -- * Types from @Df1@
- , Df1.Level
- , Df1.Path
- , Df1.Segment
- , Df1.ToSegment(segment)
- , Df1.Key
- , Df1.ToKey(key)
- , Df1.Value
- , Df1.ToValue(value)
- , Df1.Message
- , Df1.ToMessage(message)
- ) where
+    -- * Exceptions
+
+   -- , Di.Monad.throw
+
+    -- * Support for @MonadDi@ and @DiT@
+   , Di.Monad.MonadDi (..)
+   , Di.Monad.run
+   , Di.Monad.diatomically
+   , Di.Monad.onException
+
+    -- * Convenient type-synonyms
+   , Di.Df1.Df1
+   , Di.Df1.Monad.Df1T
+   , Di.Df1.Monad.MonadDf1
+
+    -- * Types from @Df1@
+   , Df1.Level
+   , Df1.Path
+   , Df1.Segment
+   , Df1.ToSegment (segment)
+   , Df1.Key
+   , Df1.ToKey (key)
+   , Df1.Value
+   , Df1.ToValue (value)
+   , Df1.Message
+   , Df1.ToMessage (message)
+   ) where
 
 import Control.Monad.Catch as Ex
 import Control.Monad.IO.Class (MonadIO)
-import Data.Sequence (Seq)
 
 import qualified Df1
 import qualified Di.Core
@@ -141,9 +147,9 @@ import qualified Di.Monad
 --    'new' $ \\di -> do
 --       -- You can start logging right away by acting
 --       -- on the on the 'Di.Core.Di' object, but here
---       -- we encourage using 'Di.Monad.runDiT' and perforfing
+--       -- we encourage using 'Di.Monad.run' and perforfing
 --       -- all your logging from within a 'Di.Df1.Monad.MonadDf1'.
---       'Di.Monad.runDiT' di $ do
+--       'Di.Monad.run' di $ do
 --           -- Our first log message!
 --           'Di.Df1.Monad.notice_' "Welcome to my program!"
 --           -- You can use `push` to separate different
@@ -163,10 +169,9 @@ import qualified Di.Monad
 --                    'Di.Df1.Monad.push' "handler" $ do
 --                       'Di.Df1.Monad.attr' "client-address" clientAddress $ do
 --                          'Di.Df1.Monad.info_' "Connection established"
---                          -- If you throw an exception with throw,
---                          -- it will be logged automatically together
---                          -- with its current scope. Isn't that nice?
---                          'Di.Monad.throw' (userError "Oops!")
+--                          -- Exceptions will be logged automatically at
+--                          -- their throw site. Isn't that nice?
+--                          'Control.Monad.Catch.throwM' $ userError "Oops!"
 -- @
 --
 -- That program will render something like this to 'System.IO.stderr':
@@ -186,32 +191,29 @@ import qualified Di.Monad
 -- 2019-11-15T18:05:54.949664482Z \/server port=80 \/handler client-address=10.0.0.8 WARNING user error (Oops!)
 -- @
 --
--- Notice that by default, /all/ exceptions thrown using 'Di.Monad.throw'
--- are logged /at their throw site/ with 'Df1.Warning' level. You can change
--- that if you care using 'Di.Monad.onException'.
+-- Notice that by default, /all/ exceptions are logged /at their throw site/
+-- with 'Df1.Warning' level. You can change that if you care using
+-- 'Di.Monad.onException'.
 --
 -- Unrelated: /df1/ escapes conflicting punctuation characters as necessary.
 new
-  :: (MonadIO m, Ex.MonadMask m)
-  => (Di.Core.Di Df1.Level Df1.Path Df1.Message -> m a)
-  -- ^ /This type is the same as @'Di.Df1.Df1' -> m a@./
-  --
-  -- Within this scope, you can use the obtained 'Di.Core.Di' safely, even
-  -- concurrently. As soon as @m a@ finishes, 'new' will block until
-  -- all logs have finished processing, before returning.
-  --
-  -- /WARNING:/ Even while @'new' commit 'pure' :: m ('Di.Core.Di' 'Df1.Level'
-  -- 'Df1.Path' 'Df1.Message')@ type-checks, attempting to use the obtained 'Di.Core.Di'
-  -- outside its intended scope will fail.
-  -> m a -- ^
+   :: (MonadIO m, Ex.MonadMask m)
+   => (Di.Core.Di Df1.Level Df1.Path Df1.Message -> m a)
+   -- ^ /This type is the same as @'Di.Df1.Df1' -> m a@./
+   --
+   -- Within this scope, you can use the obtained 'Di.Core.Di' safely, even
+   -- concurrently. As soon as @m a@ finishes, 'new' will block until
+   -- all logs have finished processing, before returning.
+   --
+   -- /WARNING:/ Even while @'new' commit 'pure' :: m ('Di.Core.Di' 'Df1.Level'
+   -- 'Df1.Path' 'Df1.Message')@ type-checks, attempting to use the obtained 'Di.Core.Di'
+   -- outside its intended scope will fail.
+   -> m a
 new act = do
-  commit <- Di.Handle.stderr Di.Df1.df1
-  Di.Core.new commit $ \di -> do
-     act (Di.Core.onException exceptionHandler di)
-
-exceptionHandler
-  :: Ex.SomeException
-  -> Maybe (Df1.Level, Seq Df1.Path, Df1.Message)
-{-# INLINE exceptionHandler #-}
-exceptionHandler = \se -> Just (Df1.Warning, mempty, Df1.message se)
-
+   commit <- Di.Handle.stderr Di.Df1.df1
+   Di.Core.new commit $ \di ->
+      act $ Di.Core.onException h di
+  where
+   h :: Ex.SomeException -> Maybe (Df1.Level, Df1.Message)
+   h = \se -> Just (Df1.Warning, Df1.message se)
+   {-# INLINE h #-}

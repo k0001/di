@@ -3,7 +3,7 @@
 }:
 mkDerivation {
   pname = "di-core";
-  version = "1.0.5";
+  version = "1.1.0";
   src = ./.;
   libraryHaskellDepends = [
     base containers safe-exceptions stm time

@@ -1,3 +1,8 @@
+# Version 1.1.0
+
+* Removed `Seq path` from `onException`.
+
+
 # Version 1.0.5
 
 * Fix test that failed when clock resolution is too small. See #44.

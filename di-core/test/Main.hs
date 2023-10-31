@@ -177,7 +177,7 @@ tt = Tasty.testGroup "di-core"
       let x = [(0::Int, ([] :: [Int]),"foo")]
       expect x $ \di0 -> do
          let di1 = Di.onException
-                      (Ex.fromException >=> \(MyError x) -> Just (0, [], x)) di0
+                      (Ex.fromException >=> \(MyError x) -> Just (0, x)) di0
          Ex.try (Di.throw di1 (MyError "foo")) >>= \case
             Left (MyError "foo") -> pure ()
             Right () -> error "got ()"
@@ -189,7 +189,7 @@ tt = Tasty.testGroup "di-core"
       expect x $ \di0 -> do
          let di1 = Di.onException
                       (Ex.asyncExceptionFromException
-                          >=> \(MyError x) -> Just (0, [], x)) di0
+                          >=> \(MyError x) -> Just (0, x)) di0
          me <- myThreadId
          Ex.tryAsync (Di.throw di1 (Ex.asyncExceptionToException (MyError "foo")))
             >>= \case Left se | Ex.asyncExceptionFromException se
@@ -240,8 +240,8 @@ tt = Tasty.testGroup "di-core"
          x -> fail ("Got " ++ show x)
   ]
 
-throwSyncException :: Ex.MonadThrow m => m ()
-throwSyncException = Ex.throwM (userError "foo")
+throwSyncException :: MonadIO m => m ()
+throwSyncException = liftIO $ Ex.throwM (userError "foo")
 
 throwAsyncException :: MonadIO m => m ()
 throwAsyncException = liftIO $ do

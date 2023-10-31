@@ -1,6 +1,6 @@
 cabal-version: 1.18
 name: di-monad
-version: 1.3.6
+version: 1.4.0
 author: Renzo Carbonara
 maintainer: renλren.zone
 copyright: Renzo Carbonara 2017
@@ -19,11 +19,6 @@ flag monad-control
   manual: True
   default: True
 
-flag pipes
-  description: Library support: pipes
-  manual: True
-  default: True
-
 flag pipes-safe
   description: Library support: pipes-safe
   manual: True
@@ -31,11 +26,6 @@ flag pipes-safe
 
 flag primitive
   description: Library support: primitive
-  manual: True
-  default: True
-
-flag streaming
-  description: Library support: streaming
   manual: True
   default: True
 
@@ -54,11 +44,6 @@ flag resourcet
   manual: True
   default: True
 
-flag conduit
-  description: Library support: conduit
-  manual: True
-  default: True
-
 library
   hs-source-dirs: lib
   default-language: Haskell2010
@@ -70,6 +55,8 @@ library
     containers,
     di-core,
     exceptions,
+    free,
+    mmorph,
     mtl,
     stm,
     transformers
@@ -78,22 +65,13 @@ library
     cpp-options: -DFLAG_monad_control -DFLAG_transformers_base
     build-depends: monad-control, transformers-base
 
-  if flag(pipes)
-    cpp-options: -DFLAG_pipes
-    build-depends: pipes
-
   if flag(pipes-safe)
-    cpp-options: -DFLAG_pipes_safe -DFLAG_pipes -DFLAG_monad_control
-                 -DFLAG_transformers_base
-    build-depends: pipes-safe, pipes, monad-control, transformers-base
+    cpp-options: -DFLAG_pipes_safe -DFLAG_monad_control -DFLAG_transformers_base
+    build-depends: pipes-safe, monad-control, transformers-base
 
   if flag(primitive)
     cpp-options: -DFLAG_primitive
     build-depends: primitive
-
-  if flag(streaming)
-    cpp-options: -DFLAG_streaming -DFLAG_transformers_base
-    build-depends: streaming, transformers-base
 
   if flag(transformers-base)
     cpp-options: -DFLAG_transformers_base
@@ -106,9 +84,4 @@ library
   if flag(resourcet)
     cpp-options: -DFLAG_resourcet -DFLAG_primitive -DFLAG_unliftio_core
     build-depends: resourcet, primitive, unliftio-core
-
-  if flag(conduit)
-    cpp-options: -DFLAG_conduit -DFLAG_primitive -DFLAG_unliftio_core
-                 -DFLAG_resourcet
-    build-depends: conduit, primitive, unliftio-core, resourcet
 

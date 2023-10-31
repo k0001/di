@@ -1,3 +1,10 @@
+# Version 1.4.0
+
+* Removed `runDiT`.
+
+* Re-export `run`, `diatomically`.
+
+
 # Version 1.3
 
 * COMPILER ASSISTED BREAKING CHANGE: Renaming logging functions again.

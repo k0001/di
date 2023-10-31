@@ -1,4 +1,5 @@
 documentation: True
+profiling: True
 tests: True
 jobs: $ncpus
 packages:

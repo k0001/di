@@ -1,3 +1,37 @@
+# Version 1.4.0
+
+* The main change in this release is that `DiT` correctly logs exception at
+  their throw site whether they are thrown through `MonadThrow` or through
+  the underlying `m`.
+
+  Supporting this feature required changing `DiT`'s internal representation.
+  The public API changed to some extent to accomodate this. Some changes were
+  necessary, and others weren't but we took the opportunity to make them since
+  they improved the overall experience.
+
+* Replaced `DiT` representation with an explicit sum type free monad with
+  an explicit bind constructor.
+
+* Introduced `MonadAtomically` as a superclass to `MonadDi`.
+
+* Default `MonadAtomically` instance for `MonadTrans`formers
+  over `MonadAtomically`.
+
+* `MonadDi` was simplified. `ask` is the only required method.
+
+* Default `MonadDi` instance for `MonadTrans`formers over `MonadDi`.
+
+* Removed `diT`, `unDiT`, `runDiT` and `runDiT'`
+
+* Introduced `run` and `run'` to run a `DiT` in a `IO`-based monad.
+
+* Introduced `diatomically` to atomically run an `DiT` over `STM`.
+
+* Removed `Seq path` from `onException`.
+
+* Introduced `localT`.
+
+
 # Version 1.3.6
 
 * Add optional support for `CatchT`.
