@@ -20,19 +20,10 @@
 -- The choices made here are:
 --
 -- * We encourage a [mtl](https://hackage.haskell.org/package/mtl) approach
---   through a typeclass called 'Di.Monad.MonadDi', for which all of the
---   monad transformers in
---   [transformers](https://hackage.haskell.org/package/transformers) and
---   [pipes](https://hackage.haskell.org/package/pipes) have instances.
+--   through a typeclass called 'Di.Monad.MonadDi'.
 --
 -- * We provide our own 'Di.Monad.DiT' monad transformer which
---   has a 'MonadDi' instance, as well as instances for all the relevant
---   typeclasses in the
---   [base](https://hackage.haskell.org/package/base),
---   [mtl](https://hackage.haskell.org/package/mtl), and
---   [exceptions](https://hackage.haskell.org/package/exceptions) libraries.
---   All of the 'MonadDi' instances exported by this package expect a
---   'DiT' transformer in the stack somewhere, and defer all work to it.
+--   has a 'MonadDi' instance.
 --
 -- * We embrace the [df1](https://hackage.haskell.org/package/df1) hierarchical
 --   structured logging format, both at the type-level and when rendering the
@@ -99,9 +90,13 @@ module Di
 
     -- * Support for @MonadDi@ and @DiT@
    , Di.Monad.MonadDi (..)
-   , Di.Monad.run
    , Di.Monad.diatomically
+   , Di.Monad.run
+   , Di.Monad.local
+   , Di.Monad.localT
    , Di.Monad.onException
+   , Di.Monad.flush
+   , Di.Monad.log
 
     -- * Convenient type-synonyms
    , Di.Df1.Df1
