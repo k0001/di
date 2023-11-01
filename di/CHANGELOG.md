@@ -7,6 +7,8 @@
 
 * Re-export `Di` from `Di.Core`.
 
+* Re-export `Level(..)` from `Df1`.
+
 
 # Version 1.3
 

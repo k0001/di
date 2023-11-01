@@ -106,7 +106,7 @@ module Di
    , Di.Df1.Monad.MonadDf1
 
     -- * Types from @Df1@
-   , Df1.Level
+   , Df1.Level(..)
    , Df1.Path
    , Df1.Segment
    , Df1.ToSegment (segment)
