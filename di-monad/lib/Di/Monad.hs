@@ -79,22 +79,42 @@ import Control.Concurrent.STM (STM)
 import Control.Concurrent.STM qualified as STM
 import Control.Monad (MonadPlus (..), ap, liftM, liftM2)
 import Control.Monad.Catch qualified as Ex
+import Control.Monad.Catch.Pure (CatchT (CatchT))
+import Control.Monad.Cont (ContT (ContT))
 import Control.Monad.Except qualified as E
-import Control.Monad.Fix (MonadFix (..))
+import Control.Monad.Fix (MonadFix (mfix))
 import Control.Monad.IO.Class (MonadIO, liftIO)
+import Control.Monad.Identity (IdentityT (IdentityT))
 import Control.Monad.Morph (MFunctor (hoist), MMonad (embed))
+import Control.Monad.RWS.Lazy qualified as RWSL
+import Control.Monad.RWS.Strict qualified as RWSS
 import Control.Monad.Reader qualified as Reader
 import Control.Monad.State qualified as State
+import Control.Monad.State.Lazy qualified as StateL
+import Control.Monad.State.Strict qualified as StateS
 import Control.Monad.Trans.Class (MonadTrans, lift)
+import Control.Monad.Trans.Maybe (MaybeT (MaybeT))
 import Control.Monad.Writer qualified as Writer
+import Control.Monad.Writer.Lazy qualified as WriterL
+import Control.Monad.Writer.Strict qualified as WriterS
 import Data.Sequence (Seq)
 import GHC.Show (appPrec1)
 import GHC.Stack (HasCallStack)
 import Unsafe.Coerce (unsafeCoerce)
 import Prelude hiding (error, filter, log)
 
+#if MIN_VERSION_transformers(0,5,3)
+import Control.Monad.Trans.Accum (AccumT(AccumT))
+import Control.Monad.Trans.Select (SelectT(SelectT))
+#endif
+
 #ifdef FLAG_unliftio_core
 import Control.Monad.IO.Unlift qualified as U
+#endif
+
+#ifdef FLAG_pipes
+import Pipes qualified as P
+import Pipes.Internal qualified as P
 #endif
 
 #ifdef FLAG_pipes_safe
@@ -116,6 +136,15 @@ import Control.Monad.Trans.Control qualified as BC
 #ifdef FLAG_resourcet
 import Control.Monad.Trans.Resource.Internal qualified as R
 #endif
+
+#ifdef FLAG_conduit
+import Data.Conduit.Internal qualified as C
+#endif
+
+#ifdef FLAG_streaming
+import Streaming.Internal qualified as S
+#endif
+
 
 import Di.Core (Di)
 import Di.Core qualified as Di
@@ -149,12 +178,14 @@ instance
 -- DiT data
 
 data DiT level path msg m a where
-   -- | 'Bind' isn't guaranteed to be right-associated by construction. When
-   -- eliminating 'DiT' into @m@, be sure to re-associate it to the right.
+   -- | 'Bind' isn't guaranteed to be right-associated by construction.
+   -- When eliminating 'DiT' into @m@, be sure to re-associate it to the right.
    Bind
       :: DiT level path msg m x
       -> (x -> DiT level path msg m a)
       -> DiT level path msg m a
+   -- | When eliminating 'DiT' into @m@, exceptions from @m@ should be logged.
+   -- See how 'run' or 'diatomically' do it.
    Effect
       :: m (DiT level path msg m a)
       -> DiT level path msg m a
@@ -298,82 +329,39 @@ class
    ask = lift ask
    {-# INLINE ask #-}
 
-   -- `local'` is defined as a method so that the `MonadDi` instances
-   -- for `DiT` can use the much more efficient `Local` constructor.
-   -- It's not necessary to export it, however.
-   local' :: (Di level path msg -> Di level path msg) -> m a -> m a
-   local' f = \ma -> localT f (lift ma)
-   {-# INLINE local' #-}
-
--- | Run @m a@ with a modified 'Di':
---
--- @
--- 'local' ('const' x) 'ask'  ==  'pure' x
--- @
---
--- Identity law:
---
--- @
--- 'local' 'id' x  ==  x
--- @
---
--- Distributive law:
---
--- @
--- 'local' f '.' 'local' g  ==  'local' (f '.' g)
--- @
---
--- Idempotence law:
---
--- @
--- 'local' f ('pure' ()) '>>' x  ==  x
--- @
-local
-   :: forall level path msg m a
-    . (MonadDi level path msg m)
-   => (Di level path msg -> Di level path msg)
-   -> m a
-   -- ^ Computation having access to the modified 'Di'.
-   -> m a
-local f = local' f
-{-# INLINE local #-}
+   -- | Run @m a@ with a modified 'Di':
+   --
+   -- @
+   -- 'local' ('const' x) 'ask'  ==  'pure' x
+   -- @
+   --
+   -- Identity law:
+   --
+   -- @
+   -- 'local' 'id' x  ==  x
+   -- @
+   --
+   -- Distributive law:
+   --
+   -- @
+   -- 'local' f '.' 'local' g  ==  'local' (f '.' g)
+   -- @
+   --
+   -- Idempotence law:
+   --
+   -- @
+   -- 'local' f ('pure' ()) '>>' x  ==  x
+   -- @
+   local :: (Di level path msg -> Di level path msg) -> m a -> m a
 
 -- | Like 'local', but allows modifying the @level@, @path@ and @msg@ types.
---
--- Notice that the original unmodified 'Di' can be recovered from inside 'DiT':
---
--- @
--- 'ask' == 'localT' f ('lift' 'ask')
--- @
 localT
-   :: forall level level' path path' msg msg' m a
-    . (MonadDi level path msg m)
-   => (Di level path msg -> Di level' path' msg')
+   :: (Di level path msg -> Di level' path' msg')
    -> DiT level' path' msg' m a
-   -- ^ Computation having access to the modified 'Di' through the outer 'DiT'
-   -- layer, and to the original 'Di' through the inner @m@ layer.
-   -> m a
-localT = \f -> go f
-  where
-   {-# INLINE go #-}
-   go
-      :: forall level'' path'' msg'' b
-       . (Di level path msg -> Di level'' path'' msg'')
-      -> DiT level'' path'' msg'' m b
-      -> m b
-   go f = \case
-      Bind tc0 kc -> case tc0 of
-         -- Reassociate Binds to the to the right:
-         Bind tx kx -> go f $ Bind tx \x -> Bind (kx x) kc
-         -- Inline `go f tc` instead of looping:
-         Effect1 mtmc -> mtmc >>= go f >>= \a -> go f (kc a)
-         Pure c -> go f (kc c)
-         Local g tc1 -> go (\d -> g (f d)) tc1 >>= \c -> go f (kc c)
-         Ask -> ask >>= \d -> go f (kc (f d))
-      Effect1 mtmb -> mtmb >>= go f
-      Pure b -> pure b
-      Local g tmb -> go (\d -> g (f d)) tmb
-      Ask -> ask >>= \d -> pure (f d)
+   -- ^ Computation having access to the modified logging environment.
+   -> DiT level path msg m a
+localT = Local
+{-# INLINE localT #-}
 
 -- | Like "Control.Concurrent.STM".'STM.atomically', but it also logging
 -- from within the 'STM' transaction.
@@ -560,31 +548,14 @@ onException f = local (Di.onException f)
 --------------------------------------------------------------------------------
 -- DiT instances
 
-instance MonadDi level path msg (DiT level path msg STM) where
-   ask = Ask
-   {-# INLINE ask #-}
-   local' = Local
-   {-# INLINE local' #-}
-
-instance MonadDi level path msg (DiT level path msg IO) where
-   ask = Ask
-   {-# INLINE ask #-}
-   local' = Local
-   {-# INLINE local' #-}
-
 instance
-   (MonadTrans t, MonadAtomically m)
-   => MonadDi level path msg (DiT level path msg (t m))
+   (MonadAtomically m)
+   => MonadDi level path msg (DiT level path msg m)
    where
-   ask = embed id Ask
+   ask = Ask
    {-# INLINE ask #-}
-   local' = Local
-   {-# INLINE local' #-}
-
-instance
-   {-# OVERLAPPABLE #-}
-   (MonadTrans t, MonadDi level path msg m)
-   => MonadDi level path msg (t m)
+   local = Local
+   {-# INLINE local #-}
 
 instance Functor (DiT level path msg m) where
    fmap = liftM
@@ -947,6 +918,160 @@ instance
     (BC.MonadBaseControl STM m)
    => BC.MonadBaseControl STM (DiT level path msg m)
 -}
+#endif
+
+--------------------------------------------------------------------------------
+-- MonadDi instances
+
+instance
+   (MonadDi level path msg m)
+   => MonadDi level path msg (Reader.ReaderT r m)
+   where
+   local f = \(Reader.ReaderT gma) -> Reader.ReaderT (\r -> local f (gma r))
+   {-# INLINE local #-}
+
+instance
+   (MonadDi level path msg m)
+   => MonadDi level path msg (StateS.StateT s m)
+   where
+   local f = \(StateS.StateT gma) -> StateS.StateT (\s -> local f (gma s))
+   {-# INLINE local #-}
+
+instance
+   (MonadDi level path msg m)
+   => MonadDi level path msg (StateL.StateT s m)
+   where
+   local f = \(StateL.StateT gma) -> StateL.StateT (\s -> local f (gma s))
+   {-# INLINE local #-}
+
+instance
+   (Monoid w, MonadDi level path msg m)
+   => MonadDi level path msg (WriterS.WriterT w m)
+   where
+   local f = \(WriterS.WriterT ma) -> WriterS.WriterT (local f ma)
+   {-# INLINE local #-}
+
+instance
+   (Monoid w, MonadDi level path msg m)
+   => MonadDi level path msg (WriterL.WriterT w m)
+   where
+   local f = \(WriterL.WriterT ma) -> WriterL.WriterT (local f ma)
+   {-# INLINE local #-}
+
+instance
+   (MonadDi level path msg m)
+   => MonadDi level path msg (MaybeT m)
+   where
+   local f = \(MaybeT ma) -> MaybeT (local f ma)
+   {-# INLINE local #-}
+
+instance
+   (MonadDi level path msg m)
+   => MonadDi level path msg (E.ExceptT e m)
+   where
+   local f = \(E.ExceptT ma) -> E.ExceptT (local f ma)
+   {-# INLINE local #-}
+
+instance
+   (MonadDi level path msg m)
+   => MonadDi level path msg (IdentityT m)
+   where
+   local f = \(IdentityT ma) -> IdentityT (local f ma)
+   {-# INLINE local #-}
+
+instance
+   (MonadDi level path msg m)
+   => MonadDi level path msg (ContT r m)
+   where
+   local f = \(ContT gma) -> ContT (\r -> local f (gma r))
+   {-# INLINE local #-}
+
+instance
+   (Monoid w, MonadDi level path msg m)
+   => MonadDi level path msg (RWSS.RWST r w s m)
+   where
+   local f = \(RWSS.RWST gma) -> RWSS.RWST (\r s -> local f (gma r s))
+   {-# INLINE local #-}
+
+instance
+   (Monoid w, MonadDi level path msg m)
+   => MonadDi level path msg (RWSL.RWST r w s m)
+   where
+   local f = \(RWSL.RWST gma) -> RWSL.RWST (\r s -> local f (gma r s))
+   {-# INLINE local #-}
+
+#if MIN_VERSION_transformers(0,5,3)
+instance (Monoid w, MonadDi level path msg m)
+ => MonadDi level path msg (AccumT w m) where
+ local f = \(AccumT gma) -> AccumT (\w -> local f (gma w))
+ {-# INLINE local #-}
+
+instance MonadDi level path msg m => MonadDi level path msg (SelectT r m) where
+ local f = \(SelectT gma) -> SelectT (\r -> local f (gma r))
+ {-# INLINE local #-}
+#endif
+
+instance (MonadDi level path msg m) => MonadDi level path msg (CatchT m) where
+   local f = \(CatchT m) -> CatchT (local f m)
+   {-# INLINE local #-}
+
+#ifdef FLAG_pipes
+instance
+   (MonadDi level path msg m)
+   => MonadDi level path msg (P.Proxy a' a b' b m)
+   where
+   {-# INLINEABLE local #-}
+   local f = \case
+      P.Request a' fa -> P.Request a' (\a -> local f (fa a))
+      P.Respond b fb' -> P.Respond b (\b' -> local f (fb' b'))
+      P.Pure r -> P.Pure r
+      P.M m -> P.M (local f m >>= \r -> pure (local f r))
+
+instance (MonadDi level path msg m) => MonadDi level path msg (P.ListT m) where
+   {-# INLINE local #-}
+   local f = \(P.Select p) -> P.Select (local f p)
+#endif
+
+#ifdef FLAG_streaming
+instance
+   (MonadDi level path msg m, Functor f)
+   => MonadDi level path msg (S.Stream f m)
+   where
+   {-# INLINEABLE local #-}
+   local g = \case
+      S.Step fs -> S.Step (local g <$> fs)
+      S.Effect ms -> S.Effect (local g <$> ms)
+      S.Return r -> S.Return r
+#endif
+
+#ifdef FLAG_resourcet
+instance
+   (MonadDi level path msg m)
+   => MonadDi level path msg (R.ResourceT m)
+   where
+   {-# INLINE local #-}
+   local f = \(R.ResourceT g) -> R.ResourceT (local f . g)
+#endif
+
+#ifdef FLAG_conduit
+instance
+   (MonadDi level path msg m)
+   => MonadDi level path msg (C.Pipe l i o u m)
+   where
+   {-# INLINEABLE local #-}
+   local f = \case
+     C.HaveOutput p o -> C.HaveOutput (local f p) o
+     C.NeedInput p c -> C.NeedInput (local f . p) (local f . c)
+     C.Done x -> C.Done x
+     C.PipeM mp -> C.PipeM (local f <$> local f mp)
+     C.Leftover p i -> C.Leftover (local f p) i
+
+instance
+   (MonadDi level path msg m)
+   => MonadDi level path msg (C.ConduitT i o m)
+   where
+   {-# INLINE local #-}
+   local f = \(C.ConduitT k) -> C.ConduitT (local f . k)
 #endif
 
 --------------------------------------------------------------------------------

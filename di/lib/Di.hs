@@ -89,15 +89,15 @@ module Di
    -- , Di.Monad.throw
 
     -- * Support for @MonadDi@ and @DiT@
-   , Di.Monad.MonadDi (..)
+   , Di.Monad.MonadDi (ask, local)
    , Di.Monad.diatomically
    , Di.Monad.run
-   , Di.Monad.local
    , Di.Monad.localT
    , Di.Monad.dilift
    , Di.Monad.onException
    , Di.Monad.flush
    , Di.Monad.log
+   , Di.Monad.DiT
 
     -- * Convenient type-synonyms
    , Di.Df1.Df1
@@ -117,7 +117,7 @@ module Di
    , Df1.ToMessage (message)
    ) where
 
-import Control.Monad.Catch as Ex
+import qualified Control.Monad.Catch as Ex
 import Control.Monad.IO.Class (MonadIO)
 
 import qualified Df1
@@ -213,3 +213,4 @@ new act = do
    h :: Ex.SomeException -> Maybe (Df1.Level, Df1.Message)
    h = \se -> Just (Df1.Warning, Df1.message se)
    {-# INLINE h #-}
+

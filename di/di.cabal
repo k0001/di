@@ -39,6 +39,7 @@ library
     di-df1,
     di-handle,
     di-monad >=1.4.0,
-    exceptions
+    exceptions,
+    transformers
   ghcjs-options: -Wall -O3
   ghc-options: -Wall -O2

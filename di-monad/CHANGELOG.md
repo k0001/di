@@ -12,14 +12,11 @@
 * Replaced `DiT` representation with an explicit sum type free monad with
   an explicit bind constructor.
 
-* Introduced `MonadAtomically` as a superclass to `MonadDi`.
+* Moved the `natSTM` from `MonadDi` into a new `MonadAtomically` superclass
+  with an `atomically` method.
 
 * Default `MonadAtomically` instance for `MonadTrans`formers
   over `MonadAtomically`.
-
-* `MonadDi` was simplified. `ask` is the only required method.
-
-* Default `MonadDi` instance for `MonadTrans`formers over `MonadDi`.
 
 * Removed `diT`, `unDiT`, `runDiT` and `runDiT'`
 
