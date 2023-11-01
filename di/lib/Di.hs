@@ -98,6 +98,7 @@ module Di
    , Di.Monad.onException
    , Di.Monad.flush
    , Di.Monad.log
+   , Di.Monad.filter
 
     -- * Convenient type-synonyms
    , Di.Df1.Df1

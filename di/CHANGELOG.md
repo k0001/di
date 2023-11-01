@@ -3,7 +3,7 @@
 * Removed `runDiT`.
 
 * Re-export `MonadDi`, `DiT`, `run`, `diatomically`, `dilift` `log`, `flush`,
-  and `localT` from `Di.Monad`
+  `filter` and `localT` from `Di.Monad`.
 
 * Re-export `Di` from `Di.Core`.
 
