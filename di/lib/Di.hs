@@ -89,7 +89,8 @@ module Di
    -- , Di.Monad.throw
 
     -- * Support for @MonadDi@ and @DiT@
-   , Di.Monad.MonadDi (ask, local)
+   , Di.Monad.ask
+   , Di.Monad.local
    , Di.Monad.diatomically
    , Di.Monad.run
    , Di.Monad.localT
@@ -97,7 +98,6 @@ module Di
    , Di.Monad.onException
    , Di.Monad.flush
    , Di.Monad.log
-   , Di.Monad.DiT
 
     -- * Convenient type-synonyms
    , Di.Df1.Df1
@@ -115,6 +115,11 @@ module Di
    , Df1.ToValue (value)
    , Df1.Message
    , Df1.ToMessage (message)
+
+     -- * Convenience re-exportS
+   , Di.Core.Di
+   , Di.Monad.DiT
+   , Di.Monad.MonadDi
    ) where
 
 import qualified Control.Monad.Catch as Ex

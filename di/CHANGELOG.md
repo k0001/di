@@ -2,8 +2,10 @@
 
 * Removed `runDiT`.
 
-* Re-export `run`, `diatomically`, `dilift` `log`, `flush`, and `localT` from
-  `Di.Monad`.
+* Re-export `MonadDi`, `DiT`, `run`, `diatomically`, `dilift` `log`, `flush`,
+  and `localT` from `Di.Monad`
+
+* Re-export `Di` from `Di.Core`.
 
 
 # Version 1.3
