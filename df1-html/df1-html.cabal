@@ -1,9 +1,10 @@
+cabal-version: 2.4
 name: df1-html
 version: 0.1.1
 author: Melisa Laura Diaz
 maintainer: renλren.zone
 copyright: Renzo Carbonara 2020
-license: BSD3
+license: BSD-3-Clause
 license-file: LICENSE.txt
 extra-source-files:
   README.md
@@ -14,7 +15,6 @@ extra-source-files:
   theme-solarized-light.png
 category: Logging
 build-type: Simple
-cabal-version: >=1.18
 synopsis: Render and parse df1 logs as HTML
 description: Render and parse df1 logs as HTML
 homepage: https://github.com/k0001/di
