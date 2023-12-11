@@ -35,16 +35,16 @@ tt =
     [ HU.testCase "Given a D.Log, render it as HTML" $ do
         expected1 @=? DHR.log log1,
 
-      HU.testCase "Parse that HTML to reobtain the D.Log" $ do 
-         case X.runParser DHP.log expected1 of 
+      HU.testCase "Parse that HTML to reobtain the D.Log" $ do
+         case X.parse DHP.log expected1 of
            Left _ -> fail "Could not parse Log."
            Right a -> log1 @=? a,
-           
+
       Tasty.localOption (QC.QuickCheckTests 2000) $
       QC.testProperty "Render/Parse roundtrip" $ do
         QC.forAllShrink QC.arbitrary QC.shrink $ \log0 -> do
          let html = DHR.log log0
-         Right log0 === X.runParser DHP.log html 
+         Right log0 === X.parse DHP.log html
     ]
 
 

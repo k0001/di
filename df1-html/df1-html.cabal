@@ -1,11 +1,11 @@
 name: df1-html
-version: 0.1
+version: 0.1.1
 author: Melisa Laura Diaz
 maintainer: renλren.zone
 copyright: Renzo Carbonara 2020
 license: BSD3
 license-file: LICENSE.txt
-extra-source-files: 
+extra-source-files:
   README.md
   CHANGELOG.md
   theme-solarized-dark.css
@@ -52,5 +52,5 @@ test-suite test
     tasty-hunit,
     tasty-quickcheck,
     text,
-    time,    
+    time,
     xmlbf

@@ -4,7 +4,7 @@
 }:
 mkDerivation {
   pname = "df1-html";
-  version = "0.1";
+  version = "0.1.1";
   src = ./.;
   libraryHaskellDepends = [
     attoparsec base bytestring containers df1 text time xmlbf
